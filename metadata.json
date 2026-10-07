@@ -1,0 +1,6 @@
+{
+  "name": "DocuVault - Quản Lý Tệp & Hạn Dùng",
+  "description": "Hệ thống tải lên, lưu trữ tệp trên Firebase, theo dõi hạn hiệu lực và tự động thông báo sắp hết hạn, xem trước tài liệu và chia sẻ tức thì qua Zalo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

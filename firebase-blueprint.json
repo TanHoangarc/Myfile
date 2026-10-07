@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "StoredFile": {
+      "title": "StoredFile",
+      "description": "Information and content of a stored file with expiration tracking",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the file"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "Display name of the file"
+        },
+        "originalName": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "Original file name when uploaded"
+        },
+        "size": {
+          "type": "number",
+          "description": "Size in bytes"
+        },
+        "type": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "MIME type of the file"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["contract", "certificate", "invoice", "id_card", "report", "other"],
+          "description": "Category of the document"
+        },
+        "fileData": {
+          "type": "string",
+          "description": "Base64 data URL or text content of the file"
+        },
+        "validFrom": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Start date of validity period (YYYY-MM-DD)"
+        },
+        "expiresAt": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Expiration date of validity period (YYYY-MM-DD)"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional notes or remarks"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Classification tags"
+        },
+        "uploader": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Name of the uploader"
+        },
+        "uploaderEmail": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Email of the uploader"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp"
+        },
+        "shareCount": {
+          "type": "number",
+          "description": "Number of times shared via Zalo or link"
+        }
+      },
+      "required": ["id", "name", "originalName", "size", "type", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/files/{fileId}": {
+      "schema": "StoredFile",
+      "description": "Collection of uploaded files and validity metadata"
+    }
+  }
+}
