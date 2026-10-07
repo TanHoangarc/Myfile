@@ -13,6 +13,7 @@ import {
   auth, 
   signInWithGoogle, 
   logOut, 
+  ensureAuth,
   saveFileToFirestore, 
   updateFileInFirestore, 
   deleteFileFromFirestore, 
@@ -21,10 +22,14 @@ import {
 } from './firebase.ts';
 import type { StoredFile } from './types/index.ts';
 import { 
-  getSampleFiles, 
   calculateExpirationInfo, 
   downloadFile 
 } from './utils/fileHelpers.ts';
+import { 
+  storeFileContent, 
+  retrieveFileContent, 
+  removeFileContent 
+} from './utils/fileStorage.ts';
 import { 
   playAlertSound, 
   requestBrowserNotificationPermission, 
@@ -39,8 +44,15 @@ import { ZaloShareModal } from './components/ZaloShareModal.tsx';
 import { ExtendExpiryModal } from './components/ExtendExpiryModal.tsx';
 import { NotificationDrawer } from './components/NotificationDrawer.tsx';
 
-const LOCAL_STORAGE_KEY = 'docuvault_local_files_v1';
-const SETTINGS_KEY = 'docuvault_settings_v1';
+const SETTINGS_KEY = 'myfile_settings_v1';
+
+const SAMPLE_FILE_IDS = [
+  'doc-hop-dong-2026',
+  'doc-chung-chi-iso',
+  'doc-hoa-don-vat',
+  'doc-cccd-giam-doc',
+  'doc-quy-che-noi-bo'
+];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -63,7 +75,7 @@ export default function App() {
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
-  // 1. Load initial settings
+  // 1. Load initial settings and purge obsolete bloated localStorage keys to eliminate quota errors
   useEffect(() => {
     try {
       const saved = localStorage.getItem(SETTINGS_KEY);
@@ -77,10 +89,23 @@ export default function App() {
     if ('Notification' in window) {
       setIsBrowserNotificationGranted(Notification.permission === 'granted');
     }
+
+    // Critical: Clean up any old localStorage file keys that caused quota errors
+    try {
+      localStorage.removeItem('docuvault_local_files_v1');
+      localStorage.removeItem('docuvault_files_v1');
+      localStorage.removeItem('docuvault_files');
+    } catch {}
+
+    // Clean up sample files from Firestore
+    SAMPLE_FILE_IDS.forEach((id) => {
+      deleteFileFromFirestore(id).catch(() => {});
+    });
   }, []);
 
   // 2. Auth State Listener
   useEffect(() => {
+    ensureAuth().catch(() => {});
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setAuthReady(true);
@@ -88,61 +113,35 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 3. Data Sync: If authenticated, subscribe to Firestore; otherwise load cached/sample files
+  // 3. Real-time Firebase Sync: Active for all users with IndexedDB cache fallback
   useEffect(() => {
-    let unsubscribeFirestore: (() => void) | null = null;
-
-    if (currentUser) {
-      try {
-        unsubscribeFirestore = subscribeToFiles(
-          (remoteFiles) => {
-            if (remoteFiles.length > 0) {
-              setFiles(remoteFiles);
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remoteFiles));
-            } else {
-              const samples = getSampleFiles();
-              setFiles(samples);
-              samples.forEach((sample) => {
-                saveFileToFirestore({
-                  ...sample,
-                  uploader: currentUser.displayName || 'Hoàng Đan',
-                  uploaderEmail: currentUser.email || 'hoangdan.xnk@gmail.com'
-                }).catch(() => {});
-              });
+    const unsubscribeFirestore = subscribeToFiles(
+      async (remoteFiles) => {
+        const userFiles = remoteFiles.filter((f) => !SAMPLE_FILE_IDS.includes(f.id));
+        
+        // Enrich files with local IndexedDB content if fileData is not in remote doc
+        const enriched = await Promise.all(
+          userFiles.map(async (remote) => {
+            if (remote.fileData) {
+              storeFileContent(remote.id, remote.fileData).catch(() => {});
+              return remote;
             }
-          },
-          (err) => {
-            console.warn('Firestore subscription fallback:', err);
-            loadLocalOrSampleFiles();
-          }
+            const localData = await retrieveFileContent(remote.id);
+            return localData ? { ...remote, fileData: localData } : remote;
+          })
         );
-      } catch (err) {
-        console.warn('Error establishing Firestore listener:', err);
-        loadLocalOrSampleFiles();
+
+        setFiles(enriched);
+      },
+      (err) => {
+        console.warn('Firestore subscription fallback:', err);
       }
-    } else {
-      loadLocalOrSampleFiles();
-    }
+    );
 
     return () => {
-      if (unsubscribeFirestore) unsubscribeFirestore();
+      unsubscribeFirestore();
     };
-  }, [currentUser]);
-
-  const loadLocalOrSampleFiles = () => {
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setFiles(parsed);
-          return;
-        }
-      }
-    } catch {}
-    const samples = getSampleFiles();
-    setFiles(samples);
-  };
+  }, []);
 
   // Automatically select first file when files load or if selected file was deleted
   useEffect(() => {
@@ -248,16 +247,21 @@ export default function App() {
   };
 
   const handleSaveFile = async (newFile: StoredFile) => {
-    const updated = [newFile, ...files.filter((f) => f.id !== newFile.id)];
-    setFiles(updated);
+    // 1. Immediately update local UI state so preview and list are responsive
+    setFiles((prev) => [newFile, ...prev.filter((f) => f.id !== newFile.id)]);
     setSelectedFileId(newFile.id);
     setMobileTab('preview');
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 
+    // 2. Persist full binary content in IndexedDB & fast memory cache
+    if (newFile.fileData) {
+      await storeFileContent(newFile.id, newFile.fileData);
+    }
+
+    // 3. Save to Firebase Firestore (supports auto chunking for large files)
     try {
       await saveFileToFirestore(newFile);
     } catch (err) {
-      console.warn('Firebase sync note (local fallback maintained):', err);
+      console.warn('Firebase save warning:', err);
     }
   };
 
@@ -266,7 +270,6 @@ export default function App() {
       f.id === fileId ? { ...f, expiresAt: newExpiresAt, updatedAt: new Date().toISOString() } : f
     );
     setFiles(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 
     try {
       await updateFileInFirestore(fileId, {
@@ -282,7 +285,9 @@ export default function App() {
   const handleDeleteFile = async (file: StoredFile) => {
     const updated = files.filter((f) => f.id !== file.id);
     setFiles(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+
+    // Remove from IndexedDB
+    await removeFileContent(file.id);
 
     if (selectedFileId === file.id) {
       setSelectedFileId(updated.length > 0 ? updated[0].id : null);
@@ -298,7 +303,6 @@ export default function App() {
   const handleBatchDelete = async (fileIds: string[]) => {
     const updated = files.filter((f) => !fileIds.includes(f.id));
     setFiles(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 
     if (selectedFileId && fileIds.includes(selectedFileId)) {
       setSelectedFileId(updated.length > 0 ? updated[0].id : null);
@@ -306,15 +310,32 @@ export default function App() {
 
     for (const id of fileIds) {
       try {
+        await removeFileContent(id);
         await deleteFileFromFirestore(id);
       } catch (e) {}
     }
   };
 
-  const handleBatchDownload = (selectedFiles: StoredFile[]) => {
+  const handleDownloadFile = async (file: StoredFile) => {
+    let toDownload = file;
+    if (!toDownload.fileData) {
+      const cached = await retrieveFileContent(file.id);
+      if (cached) {
+        toDownload = { ...file, fileData: cached };
+      }
+    }
+    downloadFile(toDownload);
+  };
+
+  const handleBatchDownload = async (selectedFiles: StoredFile[]) => {
     selectedFiles.forEach((file, index) => {
-      setTimeout(() => {
-        downloadFile(file);
+      setTimeout(async () => {
+        let toDown = file;
+        if (!toDown.fileData) {
+          const cached = await retrieveFileContent(file.id);
+          if (cached) toDown = { ...file, fileData: cached };
+        }
+        downloadFile(toDown);
       }, index * 300);
     });
   };
@@ -327,7 +348,6 @@ export default function App() {
     const newCount = (target.shareCount || 0) + 1;
     const updated = files.map((f) => (f.id === fileId ? { ...f, shareCount: newCount } : f));
     setFiles(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 
     try {
       await updateFileInFirestore(fileId, { shareCount: newCount });
@@ -400,8 +420,6 @@ export default function App() {
           </h1>
         </div>
 
-        {/* Two-Column Workspace */}
-
         {/* Mobile View Switcher (Visible only on small screens < lg) */}
         <div className="lg:hidden flex items-center bg-slate-200/80 p-1 rounded-xl">
           <button
@@ -431,7 +449,7 @@ export default function App() {
         {/* TWO-COLUMN WORKSPACE: LEFT = File List, RIGHT = File Viewer */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           
-          {/* LEFT COLUMN: File Names & List Panel (4 columns out of 12) */}
+          {/* LEFT COLUMN: File Names & List Panel */}
           <div className={`lg:col-span-5 xl:col-span-4 ${mobileTab === 'preview' ? 'hidden lg:block' : 'block'}`}>
             <FileList
               files={files}
@@ -440,7 +458,7 @@ export default function App() {
               warningDaysThreshold={warningDaysThreshold}
               currentStatusFilter={currentStatusFilter}
               onFilterChange={setCurrentStatusFilter}
-              onDownloadFile={(file) => downloadFile(file)}
+              onDownloadFile={handleDownloadFile}
               onDeleteFile={handleDeleteFile}
               onOpenZaloShare={(file) => {
                 setZaloShareFile(file);
@@ -453,7 +471,7 @@ export default function App() {
             />
           </div>
 
-          {/* RIGHT COLUMN: Live File Viewer & Expiry Details (7-8 columns out of 12) */}
+          {/* RIGHT COLUMN: Live File Viewer & Expiry Details */}
           <div className={`lg:col-span-7 xl:col-span-8 ${mobileTab === 'list' ? 'hidden lg:block' : 'block'}`}>
             <FileViewerPanel
               file={activeFile}
@@ -465,6 +483,11 @@ export default function App() {
               onExtendValidity={(file) => setExtendFile(file)}
               onDeleteFile={handleDeleteFile}
               onBackToList={() => setMobileTab('list')}
+              onFileDataLoaded={(fileId, dataUrl) => {
+                setFiles((prev) =>
+                  prev.map((f) => (f.id === fileId ? { ...f, fileData: dataUrl } : f))
+                );
+              }}
             />
           </div>
 

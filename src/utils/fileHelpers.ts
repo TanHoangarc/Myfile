@@ -119,6 +119,35 @@ export function calculateExpirationInfo(expiresAt?: string, warningDaysThreshold
   }
 }
 
+export function detectMimeType(fileName: string, providedType?: string): string {
+  if (providedType && providedType !== 'application/octet-stream' && providedType.trim() !== '') {
+    return providedType;
+  }
+  const ext = fileName.toLowerCase().split('.').pop() || '';
+  switch (ext) {
+    case 'pdf': return 'application/pdf';
+    case 'png': return 'image/png';
+    case 'jpg':
+    case 'jpeg': return 'image/jpeg';
+    case 'gif': return 'image/gif';
+    case 'webp': return 'image/webp';
+    case 'svg': return 'image/svg+xml';
+    case 'bmp': return 'image/bmp';
+    case 'txt': return 'text/plain';
+    case 'csv': return 'text/csv';
+    case 'json': return 'application/json';
+    case 'doc': return 'application/msword';
+    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls': return 'application/vnd.ms-excel';
+    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'mp3': return 'audio/mpeg';
+    case 'wav': return 'audio/wav';
+    case 'mp4': return 'video/mp4';
+    case 'webm': return 'video/webm';
+    default: return providedType || 'application/octet-stream';
+  }
+}
+
 export function getCategoryLabel(category: FileCategory): string {
   switch (category) {
     case 'contract': return 'Hợp đồng';
@@ -163,106 +192,7 @@ export function readFileAsDataURL(file: File): Promise<string> {
   });
 }
 
-// Generate realistic initial sample documents
+// Sample files list is empty so user can add their own files
 export function getSampleFiles(): StoredFile[] {
-  const now = new Date();
-  
-  // File 1: Sắp hết hạn trong 3 ngày
-  const exp1 = new Date();
-  exp1.setDate(now.getDate() + 3);
-  
-  // File 2: Đã hết hạn 5 ngày trước
-  const exp2 = new Date();
-  exp2.setDate(now.getDate() - 5);
-
-  // File 3: Còn hạn 60 ngày
-  const exp3 = new Date();
-  exp3.setDate(now.getDate() + 60);
-
-  // File 4: Còn hạn 180 ngày
-  const exp4 = new Date();
-  exp4.setDate(now.getDate() + 180);
-
-  return [
-    {
-      id: 'doc-hop-dong-2026',
-      name: 'Hop-Dong-Kinh-Te-Doi-Tac-2026.pdf',
-      originalName: 'Hop-Dong-Kinh-Te-Doi-Tac-2026.pdf',
-      size: 1420500,
-      type: 'application/pdf',
-      category: 'contract',
-      validFrom: '2026-01-15',
-      expiresAt: exp1.toISOString().split('T')[0],
-      notes: 'Hợp đồng nguyên tắc cung ứng dịch vụ logistics năm 2026, cần liên hệ đối tác gia hạn trước khi hết hiệu lực.',
-      tags: ['HopDong', 'DoiTac', 'QuanTrong'],
-      uploader: 'Hoàng Đan',
-      uploaderEmail: 'hoangdan.xnk@gmail.com',
-      createdAt: new Date(Date.now() - 86400000 * 20).toISOString(),
-      shareCount: 4
-    },
-    {
-      id: 'doc-chung-chi-iso',
-      name: 'Chung-Chi-ISO-9001-2015.pdf',
-      originalName: 'Chung-Chi-ISO-9001-2015.pdf',
-      size: 2150000,
-      type: 'application/pdf',
-      category: 'certificate',
-      validFrom: '2023-10-01',
-      expiresAt: exp2.toISOString().split('T')[0],
-      notes: 'Chứng chỉ quản lý chất lượng ISO 9001:2015 - Đã hết hạn, cần hoàn thiện hồ sơ tái đánh giá.',
-      tags: ['ISO', 'ChungChi', 'KiemDinh'],
-      uploader: 'Ban Quản lý CL',
-      uploaderEmail: 'hoangdan.xnk@gmail.com',
-      createdAt: new Date(Date.now() - 86400000 * 45).toISOString(),
-      shareCount: 8
-    },
-    {
-      id: 'doc-hoa-don-vat',
-      name: 'Hoa-Don-GTGT-Dich-Vu-So-002891.pdf',
-      originalName: 'Hoa-Don-GTGT-Dich-Vu-So-002891.pdf',
-      size: 489000,
-      type: 'application/pdf',
-      category: 'invoice',
-      validFrom: '2026-09-01',
-      expiresAt: exp3.toISOString().split('T')[0],
-      notes: 'Hóa đơn điện tử thanh toán cước phần mềm quản lý kho bãi.',
-      tags: ['HoaDon', 'KeToan', 'VAT'],
-      uploader: 'Phòng Kế toán',
-      uploaderEmail: 'hoangdan.xnk@gmail.com',
-      createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-      shareCount: 2
-    },
-    {
-      id: 'doc-cccd-giam-doc',
-      name: 'CCCD-Gan-Chip-Nguoi-Dai-Dien-PL.jpg',
-      originalName: 'CCCD-Gan-Chip-Nguoi-Dai-Dien-PL.jpg',
-      size: 890400,
-      type: 'image/jpeg',
-      category: 'id_card',
-      validFrom: '2024-05-10',
-      expiresAt: exp4.toISOString().split('T')[0],
-      notes: 'Bản quét căn cước công dân gắn chip phục vụ giao dịch ngân hàng & cấp chữ ký số.',
-      tags: ['CCCD', 'PhapLy', 'BaoMat'],
-      uploader: 'Hoàng Đan',
-      uploaderEmail: 'hoangdan.xnk@gmail.com',
-      createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      shareCount: 1
-    },
-    {
-      id: 'doc-quy-che-noi-bo',
-      name: 'Quy-Che-Bao-Mat-Du-Lieu-Noi-Bo.docx',
-      originalName: 'Quy-Che-Bao-Mat-Du-Lieu-Noi-Bo.docx',
-      size: 615000,
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      category: 'report',
-      validFrom: '2026-01-01',
-      expiresAt: undefined, // Vô thời hạn
-      notes: 'Văn bản quy định nội bộ về bảo mật tài liệu và lưu trữ đám mây.',
-      tags: ['QuyDinh', 'NoiBo'],
-      uploader: 'Phòng Hành chính',
-      uploaderEmail: 'hoangdan.xnk@gmail.com',
-      createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-      shareCount: 3
-    }
-  ];
+  return [];
 }

@@ -10,8 +10,9 @@ import {
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import type { StoredFile, FileCategory } from '../types/index.ts';
-import { formatFileSize, readFileAsDataURL } from '../utils/fileHelpers.ts';
+import { formatFileSize, readFileAsDataURL, detectMimeType } from '../utils/fileHelpers.ts';
 import { playAlertSound } from '../utils/notificationService.ts';
+import { storeFileContent } from '../utils/fileStorage.ts';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -89,12 +90,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       }
 
       const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      
+      // Persist full file data in IndexedDB
+      if (fileData) {
+        await storeFileContent(fileId, fileData);
+      }
+
       const newFile: StoredFile = {
         id: fileId,
         name: fileName.trim() || selectedFile.name,
         originalName: selectedFile.name,
         size: selectedFile.size,
-        type: selectedFile.type || 'application/octet-stream',
+        type: detectMimeType(selectedFile.name, selectedFile.type),
         category,
         fileData,
         validFrom: validFrom || undefined,

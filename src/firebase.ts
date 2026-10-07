@@ -18,6 +18,7 @@ import {
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut as firebaseSignOut,
+  signInAnonymously,
   onAuthStateChanged,
   type User
 } from 'firebase/auth';
@@ -103,17 +104,31 @@ export async function signInWithGoogle(): Promise<User> {
   }
 }
 
+export async function ensureAuth(): Promise<User | null> {
+  if (auth.currentUser) return auth.currentUser;
+  try {
+    const cred = await signInAnonymously(auth);
+    return cred.user;
+  } catch (err) {
+    return null;
+  }
+}
+
 export async function logOut(): Promise<void> {
   await firebaseSignOut(auth);
 }
 
 // Firestore File Collection operations
 const FILES_COLLECTION = 'files';
+const CHUNK_SIZE = 500000; // ~500KB per chunk to stay well under 1MB Firestore doc limit
 
 export async function saveFileToFirestore(file: StoredFile): Promise<void> {
   const docRef = doc(db, FILES_COLLECTION, file.id);
   try {
-    // Sanitize payload to avoid undefined values
+    const fileDataStr = file.fileData || '';
+    const needsChunking = fileDataStr.length > 600000;
+
+    // Sanitize payload
     const payload: Record<string, any> = {
       id: file.id,
       name: file.name,
@@ -126,7 +141,6 @@ export async function saveFileToFirestore(file: StoredFile): Promise<void> {
       shareCount: file.shareCount || 0
     };
 
-    if (file.fileData) payload.fileData = file.fileData;
     if (file.validFrom) payload.validFrom = file.validFrom;
     if (file.expiresAt) payload.expiresAt = file.expiresAt;
     if (file.notes) payload.notes = file.notes;
@@ -134,9 +148,64 @@ export async function saveFileToFirestore(file: StoredFile): Promise<void> {
     if (file.uploader) payload.uploader = file.uploader;
     if (file.uploaderEmail) payload.uploaderEmail = file.uploaderEmail;
 
+    if (!needsChunking) {
+      if (fileDataStr) {
+        payload.fileData = fileDataStr;
+      }
+      payload.hasChunks = false;
+    } else {
+      // Split into chunks and save in subcollection
+      payload.hasChunks = true;
+      const totalChunks = Math.ceil(fileDataStr.length / CHUNK_SIZE);
+      payload.chunkCount = totalChunks;
+
+      for (let i = 0; i < totalChunks; i++) {
+        const chunkText = fileDataStr.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        const chunkDocRef = doc(db, FILES_COLLECTION, file.id, 'chunks', `chunk_${i}`);
+        await setDoc(chunkDocRef, {
+          chunkIndex: i,
+          data: chunkText
+        });
+      }
+    }
+
     await setDoc(docRef, payload);
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, `${FILES_COLLECTION}/${file.id}`);
+  }
+}
+
+export async function fetchFileContentFromFirestore(fileId: string): Promise<string | null> {
+  const docRef = doc(db, FILES_COLLECTION, fileId);
+  try {
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+
+    // 1. If stored directly in fileData
+    if (data.fileData) {
+      return data.fileData as string;
+    }
+
+    // 2. If stored in chunks subcollection
+    if (data.hasChunks && data.chunkCount) {
+      const chunksCol = collection(db, FILES_COLLECTION, fileId, 'chunks');
+      const q = query(chunksCol, orderBy('chunkIndex', 'asc'));
+      const chunkSnaps = await getDocs(q);
+      let combined = '';
+      chunkSnaps.forEach((cdoc) => {
+        const cdata = cdoc.data();
+        if (cdata.data) {
+          combined += cdata.data;
+        }
+      });
+      return combined || null;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn(`Could not fetch content from Firestore for ${fileId}:`, error);
+    return null;
   }
 }
 
@@ -156,6 +225,15 @@ export async function updateFileInFirestore(fileId: string, updates: Partial<Sto
 export async function deleteFileFromFirestore(fileId: string): Promise<void> {
   const docRef = doc(db, FILES_COLLECTION, fileId);
   try {
+    // Delete any subcollection chunks first
+    try {
+      const chunksCol = collection(db, FILES_COLLECTION, fileId, 'chunks');
+      const chunkSnaps = await getDocs(chunksCol);
+      for (const cdoc of chunkSnaps.docs) {
+        await deleteDoc(cdoc.ref);
+      }
+    } catch {}
+
     await deleteDoc(docRef);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${FILES_COLLECTION}/${fileId}`);
@@ -192,7 +270,7 @@ export function subscribeToFiles(
       onUpdate(items);
     },
     (error) => {
-      console.warn('Files snapshot error (may require authentication):', error);
+      console.warn('Files snapshot error:', error);
       if (onError) onError(error);
       handleFirestoreError(error, OperationType.LIST, FILES_COLLECTION);
     }

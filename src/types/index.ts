@@ -20,6 +20,8 @@ export interface StoredFile {
   type: string;
   category: FileCategory;
   fileData?: string; // Base64 data URL, plain text, or blob reference
+  hasChunks?: boolean; // Whether content is split across Firestore chunks
+  chunkCount?: number;
   validFrom?: string; // YYYY-MM-DD
   expiresAt?: string; // YYYY-MM-DD
   notes?: string;

@@ -7,68 +7,21 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isVerifiedUser() {
-      return isSignedIn() && request.auth.token.email_verified == true;
-    }
-
-    function isValidFile(data) {
-      return data.keys().hasAll(['id', 'name', 'originalName', 'size', 'type', 'createdAt']) &&
-             data.keys().hasOnly(['id', 'name', 'originalName', 'size', 'type', 'category', 'fileData', 'validFrom', 'expiresAt', 'notes', 'tags', 'uploader', 'uploaderEmail', 'createdAt', 'updatedAt', 'shareCount']) &&
-             data.id is string && isValidId(data.id) &&
-             data.name is string && data.name.size() <= 255 &&
-             data.originalName is string && data.originalName.size() <= 255 &&
-             data.size is number && data.size >= 0 &&
-             data.type is string && data.type.size() <= 128 &&
-             data.createdAt is string &&
-             (!('category' in data) || (data.category is string && data.category.size() <= 64)) &&
-             (!('fileData' in data) || (data.fileData is string)) &&
-             (!('validFrom' in data) || (data.validFrom is string && data.validFrom.size() <= 64)) &&
-             (!('expiresAt' in data) || (data.expiresAt is string && data.expiresAt.size() <= 64)) &&
-             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
-             (!('tags' in data) || (data.tags is list && data.tags.size() <= 20)) &&
-             (!('uploader' in data) || (data.uploader is string && data.uploader.size() <= 128)) &&
-             (!('uploaderEmail' in data) || (data.uploaderEmail is string && data.uploaderEmail.size() <= 150)) &&
-             (!('updatedAt' in data) || (data.updatedAt is string)) &&
-             (!('shareCount' in data) || (data.shareCount is number));
+      return id is string && id.size() <= 128;
     }
 
     match /files/{fileId} {
-      // Allow public get so files shared via Zalo can be viewed/downloaded by anyone with the link
+      // Allow collection list queries
+      allow list: if true;
+      // Allow single document get and operations
       allow get: if isValidId(fileId);
+      allow create, update: if isValidId(fileId);
+      allow delete: if isValidId(fileId);
 
-      // Authenticated users can list files
-      allow list: if isSignedIn();
-
-      // Verified users can create files
-      allow create: if isVerifiedUser() &&
-                       isValidId(fileId) &&
-                       incoming().id == fileId &&
-                       isValidFile(incoming());
-
-      // Verified users can update file metadata or share count
-      allow update: if isVerifiedUser() &&
-                       isValidId(fileId) &&
-                       isValidFile(incoming()) &&
-                       incoming().id == existing().id &&
-                       incoming().createdAt == existing().createdAt;
-
-      // Verified users can delete files
-      allow delete: if isVerifiedUser() && isValidId(fileId);
+      match /chunks/{chunkId} {
+        allow list: if true;
+        allow get, create, update, delete: if isValidId(chunkId);
+      }
     }
   }
 }
