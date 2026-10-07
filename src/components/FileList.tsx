@@ -17,8 +17,7 @@ import type { StoredFile } from '../types/index.ts';
 import { 
   formatFileSize, 
   formatDateVN, 
-  calculateExpirationInfo, 
-  getCategoryLabel 
+  calculateExpirationInfo 
 } from '../utils/fileHelpers.ts';
 
 interface FileListProps {
@@ -53,7 +52,6 @@ export const FileList: React.FC<FileListProps> = ({
   onOpenUpload
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'expiry_asc' | 'created_desc' | 'name_asc' | 'size_desc'>('expiry_asc');
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [fileToDelete, setFileToDelete] = useState<StoredFile | null>(null);
@@ -68,11 +66,6 @@ export const FileList: React.FC<FileListProps> = ({
       const matchTags = file.tags?.some((t) => t.toLowerCase().includes(q));
       const matchUploader = file.uploader?.toLowerCase().includes(q);
       if (!matchName && !matchNotes && !matchTags && !matchUploader) return false;
-    }
-
-    // Category filter
-    if (selectedCategory !== 'all' && file.category !== selectedCategory) {
-      return false;
     }
 
     // Expiration status filter
@@ -131,10 +124,10 @@ export const FileList: React.FC<FileListProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col h-full min-h-[620px] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col h-full min-h-[900px] lg:min-h-[1200px] overflow-hidden">
       
       {/* Top Header of Left Panel */}
-      <div className="p-4 border-b border-slate-200 bg-slate-50/70 space-y-3">
+      <div className="p-4 border-b border-slate-200 bg-slate-50/70 space-y-3 shrink-0">
         
         {/* Title & Upload Button */}
         <div className="flex items-center justify-between gap-2">
@@ -156,24 +149,41 @@ export const FileList: React.FC<FileListProps> = ({
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm tên tệp, ghi chú, tag..."
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600"
+        {/* Search Bar & Sort Dropdown */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm tên tệp, ghi chú..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative w-36 shrink-0">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="w-full pl-2.5 pr-6 py-1.5 text-[11px] rounded-xl border border-slate-200 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
-              ✕
-            </button>
-          )}
+              <option value="expiry_asc">⏳ Hạn gần nhất</option>
+              <option value="created_desc">🆕 Mới nhất</option>
+              <option value="name_asc">🔤 Tên A-Z</option>
+              <option value="size_desc">💾 Dung lượng</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Status Filters */}
@@ -196,39 +206,6 @@ export const FileList: React.FC<FileListProps> = ({
               {tab.label}
             </button>
           ))}
-        </div>
-
-        {/* Category & Sort controls */}
-        <div className="flex items-center justify-between gap-2 pt-1 text-xs">
-          {/* Category Dropdown */}
-          <div className="relative flex-1">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full pl-2 pr-6 py-1 text-[11px] rounded-lg border border-slate-200 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-hidden"
-            >
-              <option value="all">Tất cả danh mục</option>
-              <option value="contract">Hợp đồng</option>
-              <option value="id_card">Giấy tờ tùy thân</option>
-              <option value="other">Tài liệu khác</option>
-            </select>
-            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          {/* Sort Dropdown */}
-          <div className="relative flex-1">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="w-full pl-2 pr-6 py-1 text-[11px] rounded-lg border border-slate-200 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-hidden"
-            >
-              <option value="expiry_asc">⏳ Hạn gần nhất</option>
-              <option value="created_desc">🆕 Mới nhất</option>
-              <option value="name_asc">🔤 Tên A-Z</option>
-              <option value="size_desc">💾 Dung lượng</option>
-            </select>
-            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
         </div>
 
       </div>
@@ -325,8 +302,6 @@ export const FileList: React.FC<FileListProps> = ({
                         {file.name}
                       </h4>
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
-                        <span className="font-medium">{getCategoryLabel(file.category)}</span>
-                        <span>•</span>
                         <span className="font-mono">{formatFileSize(file.size)}</span>
                       </div>
                     </div>

@@ -22,9 +22,7 @@ import {
 import type { StoredFile } from '../types/index.ts';
 import { 
   formatFileSize, 
-  formatDateVN, 
   calculateExpirationInfo, 
-  getCategoryLabel, 
   downloadFile 
 } from '../utils/fileHelpers.ts';
 import { retrieveFileContent, storeFileContent, dataUrlToBlobUrl } from '../utils/fileStorage.ts';
@@ -232,10 +230,10 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col h-full min-h-[620px] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col h-full min-h-[900px] lg:min-h-[1200px] overflow-hidden">
       
       {/* Header of Viewer */}
-      <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/80 flex flex-wrap items-center justify-between gap-3">
+      <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
         
         {/* Mobile Back Button & File Title */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -264,8 +262,6 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
               {file.name}
             </h2>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
-              <span className="font-medium text-slate-700">{getCategoryLabel(file.category)}</span>
-              <span>•</span>
               <span className="font-mono">{formatFileSize(file.size)}</span>
               {expInfo && (
                 <>
@@ -280,7 +276,44 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
         </div>
 
         {/* Action Toolbar */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Image Zoom & Rotate Controls directly in toolbar */}
+          {isImage && effectiveData && (
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 mr-1 shadow-2xs">
+              <button
+                onClick={handleZoomIn}
+                className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                title="Phóng to"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleZoomOut}
+                className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                title="Thu nhỏ"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleRotate}
+                className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                title="Xoay hình ảnh"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleResetZoom}
+                className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                title="Đặt lại"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+              <span className="text-[10px] font-mono font-semibold text-slate-600 px-1">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+            </div>
+          )}
+
           {/* Open full in new tab */}
           {(isPdf || isImage || blobUrl) && (
             <button
@@ -345,103 +378,47 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
 
       </div>
 
-      {/* Main Preview Area */}
-      <div className="flex-1 flex flex-col bg-slate-100/70 relative overflow-hidden min-h-[440px]">
+      {/* Main Preview Area: Styled like an authentic desk / document reader workspace */}
+      <div className="flex-1 flex flex-col bg-slate-200/70 relative overflow-y-auto min-h-0">
         
-        {/* Floating Controls for Image */}
-        {isImage && effectiveData && (
-          <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-white/95 backdrop-blur-md rounded-xl p-1 shadow-md border border-slate-200/80">
-            <button
-              onClick={handleZoomIn}
-              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
-              title="Phóng to"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleZoomOut}
-              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
-              title="Thu nhỏ"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleRotate}
-              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
-              title="Xoay hình ảnh"
-            >
-              <RotateCw className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleResetZoom}
-              className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
-              title="Đặt lại"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-xs font-semibold text-slate-600 px-2 font-mono">
-              {Math.round(zoomLevel * 100)}%
-            </span>
-          </div>
-        )}
-
-        {/* Content Viewer Body */}
-        <div className="flex-1 overflow-auto flex items-center justify-center p-3 sm:p-5">
+        {/* Content Viewer Body: Centered A4 Page Sheet */}
+        <div className="flex-1 flex flex-col items-center justify-start p-3 sm:p-6 lg:p-8 overflow-y-auto">
           
           {isLoadingContent ? (
-            <div className="text-center p-8 space-y-2">
+            <div className="text-center p-12 space-y-2 my-auto">
               <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
               <p className="text-xs text-slate-500 font-medium">Đang tải dữ liệu xem trước từ Firebase...</p>
             </div>
           ) : isImage && effectiveData ? (
-            /* 1. IMAGE VIEWER */
-            <div className="overflow-auto max-w-full max-h-full flex items-center justify-center p-2">
-              <img
-                src={effectiveData}
-                alt={file.name}
-                style={{
-                  transform: `scale(${zoomLevel}) rotate(${rotation}deg)`,
-                  transition: 'transform 0.2s ease-out'
-                }}
-                className="max-w-full max-h-[64vh] object-contain rounded-xl shadow-md border border-slate-200 bg-white"
-              />
+            /* 1. IMAGE VIEWER - Displayed vertically down like an authentic A4 document page */
+            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col items-center justify-start p-6 sm:p-10 relative">
+              <div className="w-full flex justify-center overflow-auto">
+                <img
+                  src={effectiveData}
+                  alt={file.name}
+                  style={{
+                    transform: `scale(${zoomLevel}) rotate(${rotation}deg)`,
+                    transformOrigin: 'top center',
+                    transition: 'transform 0.2s ease-out'
+                  }}
+                  className="max-w-full w-auto h-auto object-contain shadow-xs rounded-xs"
+                />
+              </div>
             </div>
           ) : isPdf && blobUrl ? (
-            /* 2. PDF VIEWER: With toolbar and embedded view */
-            <div className="w-full h-full min-h-[520px] flex flex-col bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
-              <div className="px-4 py-2 bg-slate-800 text-white flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{file.name}</span>
-                  <span className="text-slate-400 font-mono">({formatFileSize(file.size)})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleOpenExternal}
-                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium flex items-center gap-1 transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Mở tab mới</span>
-                  </button>
-                  <button
-                    onClick={() => downloadFile({ ...file, fileData: effectiveData })}
-                    className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded font-medium flex items-center gap-1 transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Tải về</span>
-                  </button>
-                </div>
-              </div>
+            /* 2. PDF VIEWER - Full tall A4 sheet proportions (794px x 1123px standard A4) */
+            <div className="w-full max-w-[794px] h-[1123px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col overflow-hidden">
               <iframe
                 src={`${blobUrl}#toolbar=1&navpanes=0`}
                 title={file.name}
-                className="w-full flex-1 min-h-[500px] border-0"
+                className="w-full flex-1 border-0 h-full"
               />
             </div>
           ) : isCsv && csvRows.length > 0 ? (
-            /* 3. CSV SPREADSHEET TABLE VIEWER */
-            <div className="w-full h-full max-h-[64vh] bg-white rounded-xl shadow-xs border border-slate-200 overflow-auto flex flex-col">
-              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-700">Xem trước dữ liệu bảng ({csvRows.length} dòng)</span>
+            /* 3. CSV SPREADSHEET - A4 document sheet */
+            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col overflow-hidden">
+              <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs shrink-0">
+                <span className="font-bold text-slate-700">Xem trước bảng tính ({csvRows.length} dòng)</span>
                 <button
                   onClick={handleCopyText}
                   className="flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium"
@@ -476,127 +453,95 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
               </div>
             </div>
           ) : isText && textContent ? (
-            /* 4. TEXT / CODE VIEWER */
-            <div className="w-full h-full min-h-[450px] max-h-[65vh] bg-slate-900 text-slate-100 rounded-xl flex flex-col overflow-hidden shadow-inner font-mono text-xs">
-              <div className="px-4 py-2 bg-slate-800 text-slate-300 flex items-center justify-between border-b border-slate-700 text-xs">
-                <span>{file.name}</span>
+            /* 4. TEXT / DOCUMENT - Long A4 paper sheet with standard document margins */
+            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col overflow-hidden">
+              <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 text-slate-700 flex items-center justify-between text-xs shrink-0">
+                <span className="font-semibold">{file.name}</span>
                 <button
                   onClick={handleCopyText}
-                  className="flex items-center gap-1 text-slate-300 hover:text-white"
+                  className="flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium"
                 >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{isCopied ? 'Đã chép' : 'Sao chép văn bản'}</span>
+                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{isCopied ? 'Đã chép' : 'Sao chép'}</span>
                 </button>
               </div>
-              <div className="p-4 overflow-auto flex-1 leading-relaxed">
-                <pre className="whitespace-pre-wrap select-text">{textContent}</pre>
+              <div className="p-8 sm:p-14 flex-1 text-slate-800 text-sm leading-relaxed overflow-auto">
+                <pre className="whitespace-pre-wrap select-text font-mono text-xs sm:text-sm">{textContent}</pre>
               </div>
             </div>
           ) : isAudio && effectiveData ? (
             /* 5. AUDIO VIEWER */
-            <div className="bg-white p-8 rounded-2xl shadow-md border border-slate-200 text-center space-y-4 max-w-md w-full">
-              <h4 className="font-bold text-slate-800 text-sm">{file.name}</h4>
-              <audio controls className="w-full">
+            <div className="w-full max-w-[794px] min-h-[400px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col items-center justify-center p-8 text-center space-y-4">
+              <h4 className="font-bold text-slate-800 text-base">{file.name}</h4>
+              <audio controls className="w-full max-w-md">
                 <source src={effectiveData} type={file.type} />
               </audio>
             </div>
           ) : isVideo && effectiveData ? (
             /* 6. VIDEO VIEWER */
-            <div className="max-w-2xl w-full bg-black rounded-2xl overflow-hidden shadow-xl">
-              <video controls className="w-full h-auto max-h-[65vh]">
+            <div className="w-full max-w-[794px] bg-black shadow-2xl rounded-xs overflow-hidden my-2">
+              <video controls className="w-full h-auto max-h-[80vh]">
                 <source src={effectiveData} type={file.type} />
               </video>
             </div>
           ) : (
-            /* 7. WORD / EXCEL / DOCUMENTS OR WHEN DATA IS AVAILABLE FOR DOWNLOAD */
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center max-w-md w-full space-y-4 my-auto">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
-                {isSpreadsheet ? (
-                  <FileSpreadsheet className="w-8 h-8 text-emerald-600" />
-                ) : (
-                  <FileText className="w-8 h-8 text-blue-600" />
-                )}
-              </div>
+            /* 7. WORD / EXCEL / DOCUMENTS / FALLBACK - Authentic A4 sheet page */
+            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl border border-slate-300 rounded-xs my-2 p-10 sm:p-16 flex flex-col justify-between">
               <div>
-                <h4 className="font-bold text-slate-900 text-base">{file.name}</h4>
-                <p className="text-xs text-slate-500 mt-1">
-                  Định dạng: <span className="font-semibold text-slate-700">{file.type || 'Tài liệu'}</span> • {formatFileSize(file.size)}
-                </p>
-                <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Đã lưu trữ an toàn trên MyFile & Firebase</span>
+                <div className="border-b-2 border-slate-800 pb-5 mb-8 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 tracking-tight">{file.name}</h3>
+                    <p className="text-xs text-slate-500 mt-1 font-mono">Dung lượng: {formatFileSize(file.size)}</p>
+                  </div>
+                  {expInfo && (
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${expInfo.colorClass.badge}`}>
+                      {expInfo.label}
+                    </span>
+                  )}
+                </div>
+
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
+                    {isSpreadsheet ? (
+                      <FileSpreadsheet className="w-8 h-8 text-emerald-600" />
+                    ) : (
+                      <FileText className="w-8 h-8 text-blue-600" />
+                    )}
+                  </div>
+                  <div className="space-y-1 max-w-sm">
+                    <p className="text-sm font-semibold text-slate-800">
+                      Tệp {file.name.split('.').pop()?.toUpperCase() || 'tài liệu'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Để xem đầy đủ nội dung tệp này, bạn có thể tải về máy tính hoặc chia sẻ nhanh qua Zalo.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 pt-3">
+                    <button
+                      onClick={() => downloadFile({ ...file, fileData: effectiveData })}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Tải về máy tính</span>
+                    </button>
+                    <button
+                      onClick={() => onOpenZaloShare(file)}
+                      className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span>Gửi qua Zalo</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <button
-                  onClick={() => downloadFile({ ...file, fileData: effectiveData })}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Tải về máy tính</span>
-                </button>
-                <button
-                  onClick={() => onOpenZaloShare(file)}
-                  className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors"
-                >
-                  <Share2 className="w-4 h-4" />
-                  <span>Gửi qua Zalo</span>
-                </button>
+              <div className="border-t border-slate-200 pt-4 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                <span>MyFile Cloud Storage</span>
+                <span>Khổ A4 (210 × 297 mm)</span>
               </div>
             </div>
           )}
 
-        </div>
-
-      </div>
-
-      {/* Bottom Metadata & Notes Bar */}
-      <div className="p-4 bg-white border-t border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-        
-        {/* Validity Summary */}
-        <div className={`p-3 rounded-xl border ${expInfo?.colorClass.border || 'border-slate-200'} ${expInfo?.colorClass.bg || 'bg-slate-50'} flex items-center justify-between`}>
-          <div className="space-y-0.5">
-            <span className="font-bold uppercase tracking-wider text-[11px] text-slate-700 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
-              Hạn hiệu lực
-            </span>
-            <p className="text-slate-600">
-              {formatDateVN(file.validFrom)} → <span className="font-semibold text-slate-800">{formatDateVN(file.expiresAt)}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => onExtendValidity(file)}
-            className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-lg font-semibold text-[11px] shadow-2xs"
-          >
-            Gia hạn
-          </button>
-        </div>
-
-        {/* Notes */}
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-          <span className="font-bold uppercase tracking-wider text-[11px] text-slate-600 block mb-0.5">
-            Ghi chú
-          </span>
-          <p className="text-slate-700 line-clamp-2 italic">
-            {file.notes || 'Không có ghi chú thêm.'}
-          </p>
-        </div>
-
-        {/* Details & Uploader */}
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-          <div className="flex justify-between text-slate-500 text-[11px]">
-            <span>Người tải:</span>
-            <span className="font-medium text-slate-800">{file.uploader || 'Người dùng'}</span>
-          </div>
-          <div className="flex justify-between text-slate-500 text-[11px]">
-            <span>Lượt gửi Zalo:</span>
-            <span className="font-semibold text-blue-600">{file.shareCount || 0} lượt</span>
-          </div>
-          <div className="flex justify-between text-slate-500 text-[11px]">
-            <span>Ngày tạo:</span>
-            <span className="font-medium text-slate-700">{formatDateVN(file.createdAt)}</span>
-          </div>
         </div>
 
       </div>

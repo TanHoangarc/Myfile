@@ -447,10 +447,10 @@ export default function App() {
         </div>
 
         {/* TWO-COLUMN WORKSPACE: LEFT = File List, RIGHT = File Viewer */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
           
           {/* LEFT COLUMN: File Names & List Panel */}
-          <div className={`lg:col-span-5 xl:col-span-4 ${mobileTab === 'preview' ? 'hidden lg:block' : 'block'}`}>
+          <div className={`lg:col-span-5 xl:col-span-4 h-full flex flex-col ${mobileTab === 'preview' ? 'hidden lg:flex' : 'flex'}`}>
             <FileList
               files={files}
               selectedFileId={selectedFileId}
@@ -472,7 +472,7 @@ export default function App() {
           </div>
 
           {/* RIGHT COLUMN: Live File Viewer & Expiry Details */}
-          <div className={`lg:col-span-7 xl:col-span-8 ${mobileTab === 'list' ? 'hidden lg:block' : 'block'}`}>
+          <div className={`lg:col-span-7 xl:col-span-8 h-full flex flex-col ${mobileTab === 'list' ? 'hidden lg:flex' : 'flex'}`}>
             <FileViewerPanel
               file={activeFile}
               warningDaysThreshold={warningDaysThreshold}
