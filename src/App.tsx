@@ -28,7 +28,14 @@ import {
 import { 
   storeFileContent, 
   retrieveFileContent, 
-  removeFileContent 
+  removeFileContent,
+  saveLocalFileRecord,
+  getAllLocalFiles,
+  deleteLocalFileRecord,
+  isDeletedTombstone,
+  removeTombstone,
+  cacheMetadataList,
+  getCachedMetadataList
 } from './utils/fileStorage.ts';
 import { 
   playAlertSound, 
@@ -57,7 +64,14 @@ const SAMPLE_FILE_IDS = [
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [files, setFiles] = useState<StoredFile[]>([]);
+  const [files, setFiles] = useState<StoredFile[]>(() => {
+    try {
+      const cached = getCachedMetadataList();
+      return cached.filter((f) => !SAMPLE_FILE_IDS.includes(f.id) && !isDeletedTombstone(f.id));
+    } catch {
+      return [];
+    }
+  });
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<'list' | 'preview'>('list');
   
@@ -96,11 +110,6 @@ export default function App() {
       localStorage.removeItem('docuvault_files_v1');
       localStorage.removeItem('docuvault_files');
     } catch {}
-
-    // Clean up sample files from Firestore
-    SAMPLE_FILE_IDS.forEach((id) => {
-      deleteFileFromFirestore(id).catch(() => {});
-    });
   }, []);
 
   // 2. Auth State Listener
@@ -113,15 +122,59 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 3. Real-time Firebase Sync: Active for all users with IndexedDB cache fallback
+  // 3. Initial Hydration from local IndexedDB (instant, reliable, zero network dependency)
+  useEffect(() => {
+    let isMounted = true;
+    getAllLocalFiles().then(async (localRecords) => {
+      if (!isMounted || !localRecords || localRecords.length === 0) return;
+      const validLocal = localRecords.filter(
+        (f) => !SAMPLE_FILE_IDS.includes(f.id) && !isDeletedTombstone(f.id)
+      );
+      if (validLocal.length === 0) return;
+
+      const enriched = await Promise.all(
+        validLocal.map(async (f) => {
+          if (f.fileData) return f;
+          const blob = await retrieveFileContent(f.id);
+          return blob ? { ...f, fileData: blob } : f;
+        })
+      );
+
+      if (!isMounted) return;
+      setFiles((prev) => {
+        const map = new Map<string, StoredFile>();
+        // Add enriched local records
+        enriched.forEach((item) => map.set(item.id, item));
+        // Keep any existing in-memory state
+        prev.forEach((p) => {
+          if (!map.has(p.id) && !isDeletedTombstone(p.id)) {
+            map.set(p.id, p);
+          }
+        });
+        const combined = Array.from(map.values()).sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+        cacheMetadataList(combined);
+        return combined;
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 4. Real-time Firebase Sync with intelligent local IndexedDB preservation (never wipes local files!)
   useEffect(() => {
     const unsubscribeFirestore = subscribeToFiles(
       async (remoteFiles) => {
-        const userFiles = remoteFiles.filter((f) => !SAMPLE_FILE_IDS.includes(f.id));
+        const userRemoteFiles = remoteFiles.filter(
+          (f) => !SAMPLE_FILE_IDS.includes(f.id) && !isDeletedTombstone(f.id)
+        );
         
-        // Enrich files with local IndexedDB content if fileData is not in remote doc
-        const enriched = await Promise.all(
-          userFiles.map(async (remote) => {
+        // Enrich remote files with local IndexedDB content if fileData is not in remote doc
+        const enrichedRemote = await Promise.all(
+          userRemoteFiles.map(async (remote) => {
             if (remote.fileData) {
               storeFileContent(remote.id, remote.fileData).catch(() => {});
               return remote;
@@ -131,7 +184,34 @@ export default function App() {
           })
         );
 
-        setFiles(enriched);
+        // Cache remote files into IndexedDB
+        for (const rem of enrichedRemote) {
+          saveLocalFileRecord(rem).catch(() => {});
+        }
+
+        // Retrieve local files from IndexedDB to ensure unsynced or quota-limited local files are NEVER WIPED OUT
+        const localRecords = await getAllLocalFiles();
+        const remoteIds = new Set(enrichedRemote.map((r) => r.id));
+
+        const unsyncedLocal = localRecords.filter(
+          (l) => !remoteIds.has(l.id) && !SAMPLE_FILE_IDS.includes(l.id) && !isDeletedTombstone(l.id)
+        );
+
+        const enrichedLocal = await Promise.all(
+          unsyncedLocal.map(async (l) => {
+            if (l.fileData) return l;
+            const data = await retrieveFileContent(l.id);
+            return data ? { ...l, fileData: data } : l;
+          })
+        );
+
+        // Combine remote files + local-only files
+        const combined = [...enrichedRemote, ...enrichedLocal].sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+
+        setFiles(combined);
+        cacheMetadataList(combined);
       },
       (err) => {
         console.warn('Firestore subscription fallback:', err);
@@ -247,22 +327,25 @@ export default function App() {
   };
 
   const handleSaveFile = async (newFile: StoredFile) => {
-    // 1. Immediately update local UI state so preview and list are responsive
-    setFiles((prev) => [newFile, ...prev.filter((f) => f.id !== newFile.id)]);
+    // 1. Remove tombstone if previously deleted
+    removeTombstone(newFile.id);
+
+    // 2. Immediately update local UI state so preview and list are instantaneous (< 1ms)
+    setFiles((prev) => {
+      const updated = [newFile, ...prev.filter((f) => f.id !== newFile.id)];
+      cacheMetadataList(updated);
+      return updated;
+    });
     setSelectedFileId(newFile.id);
     setMobileTab('preview');
 
-    // 2. Persist full binary content in IndexedDB & fast memory cache
-    if (newFile.fileData) {
-      await storeFileContent(newFile.id, newFile.fileData);
-    }
+    // 3. Persist complete file record and binary content in IndexedDB
+    await saveLocalFileRecord(newFile);
 
-    // 3. Save to Firebase Firestore (supports auto chunking for large files)
-    try {
-      await saveFileToFirestore(newFile);
-    } catch (err) {
-      console.warn('Firebase save warning:', err);
-    }
+    // 4. Save to Firebase Firestore in the background asynchronously without blocking UI or modal
+    saveFileToFirestore(newFile).catch((err) => {
+      console.warn('Background Firestore save note:', err);
+    });
   };
 
   const handleUpdateExpiry = async (fileId: string, newExpiresAt?: string) => {
@@ -270,6 +353,12 @@ export default function App() {
       f.id === fileId ? { ...f, expiresAt: newExpiresAt, updatedAt: new Date().toISOString() } : f
     );
     setFiles(updated);
+    cacheMetadataList(updated);
+
+    const target = updated.find((f) => f.id === fileId);
+    if (target) {
+      saveLocalFileRecord(target).catch(() => {});
+    }
 
     try {
       await updateFileInFirestore(fileId, {
@@ -285,34 +374,32 @@ export default function App() {
   const handleDeleteFile = async (file: StoredFile) => {
     const updated = files.filter((f) => f.id !== file.id);
     setFiles(updated);
+    cacheMetadataList(updated);
 
-    // Remove from IndexedDB
-    await removeFileContent(file.id);
+    // Remove from IndexedDB and record tombstone
+    await deleteLocalFileRecord(file.id);
 
     if (selectedFileId === file.id) {
       setSelectedFileId(updated.length > 0 ? updated[0].id : null);
     }
 
-    try {
-      await deleteFileFromFirestore(file.id);
-    } catch (err) {
-      console.warn('Firestore delete error:', err);
-    }
+    deleteFileFromFirestore(file.id).catch((err) => {
+      console.warn('Firestore delete note:', err);
+    });
   };
 
   const handleBatchDelete = async (fileIds: string[]) => {
     const updated = files.filter((f) => !fileIds.includes(f.id));
     setFiles(updated);
+    cacheMetadataList(updated);
 
     if (selectedFileId && fileIds.includes(selectedFileId)) {
       setSelectedFileId(updated.length > 0 ? updated[0].id : null);
     }
 
     for (const id of fileIds) {
-      try {
-        await removeFileContent(id);
-        await deleteFileFromFirestore(id);
-      } catch (e) {}
+      deleteLocalFileRecord(id).catch(() => {});
+      deleteFileFromFirestore(id).catch(() => {});
     }
   };
 

@@ -24,6 +24,7 @@ import {
 } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 import type { StoredFile } from './types/index.ts';
+import { createImageThumbnail } from './utils/fileHelpers.ts';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -90,6 +91,42 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+// Quota Management: Avoid bombarding backend when free daily write quota is reached
+const QUOTA_KEY = 'firestore_quota_exhausted_until';
+
+export function isFirestoreQuotaExhausted(): boolean {
+  try {
+    const val = localStorage.getItem(QUOTA_KEY);
+    if (!val) return false;
+    const expires = parseInt(val, 10);
+    if (Date.now() < expires) {
+      return true;
+    }
+    localStorage.removeItem(QUOTA_KEY);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function markFirestoreQuotaExhausted(): void {
+  try {
+    // Suppress repeated failed writes for 3 hours to avoid backoff loop and console overload
+    localStorage.setItem(QUOTA_KEY, String(Date.now() + 3 * 60 * 60 * 1000));
+  } catch {}
+}
+
+export function isQuotaError(err: any): boolean {
+  if (!err) return false;
+  const msg = typeof err === 'string' ? err : err?.message || err?.code || '';
+  return (
+    err?.code === 'resource-exhausted' ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('Quota limit exceeded') ||
+    msg.includes('Free daily write units')
+  );
+}
+
 // Authentication helpers
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -120,13 +157,17 @@ export async function logOut(): Promise<void> {
 
 // Firestore File Collection operations
 const FILES_COLLECTION = 'files';
-const CHUNK_SIZE = 500000; // ~500KB per chunk to stay well under 1MB Firestore doc limit
 
 export async function saveFileToFirestore(file: StoredFile): Promise<void> {
+  // If quota is exhausted, skip remote write to avoid repetitive backoff errors
+  if (isFirestoreQuotaExhausted()) {
+    console.info('Firestore daily write quota reached; file safely stored in local IndexedDB.');
+    return;
+  }
+
   const docRef = doc(db, FILES_COLLECTION, file.id);
   try {
     const fileDataStr = file.fileData || '';
-    const needsChunking = fileDataStr.length > 600000;
 
     // Sanitize payload
     const payload: Record<string, any> = {
@@ -138,7 +179,8 @@ export async function saveFileToFirestore(file: StoredFile): Promise<void> {
       category: file.category || 'other',
       createdAt: file.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      shareCount: file.shareCount || 0
+      shareCount: file.shareCount || 0,
+      hasChunks: false
     };
 
     if (file.validFrom) payload.validFrom = file.validFrom;
@@ -148,30 +190,37 @@ export async function saveFileToFirestore(file: StoredFile): Promise<void> {
     if (file.uploader) payload.uploader = file.uploader;
     if (file.uploaderEmail) payload.uploaderEmail = file.uploaderEmail;
 
-    if (!needsChunking) {
-      if (fileDataStr) {
+    // Fast & Safe file storage strategy:
+    // 1. If small dataURL (<= 350KB), save directly into the Firestore doc (1 single atomic write)
+    // 2. If it's an image > 350KB, compress to a lightweight web thumbnail so cloud sync is fast and quota-safe
+    // 3. For large non-images, store metadata in Firestore while full data lives securely in local IndexedDB
+    if (fileDataStr) {
+      if (fileDataStr.length <= 350000) {
         payload.fileData = fileDataStr;
-      }
-      payload.hasChunks = false;
-    } else {
-      // Split into chunks and save in subcollection
-      payload.hasChunks = true;
-      const totalChunks = Math.ceil(fileDataStr.length / CHUNK_SIZE);
-      payload.chunkCount = totalChunks;
-
-      for (let i = 0; i < totalChunks; i++) {
-        const chunkText = fileDataStr.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        const chunkDocRef = doc(db, FILES_COLLECTION, file.id, 'chunks', `chunk_${i}`);
-        await setDoc(chunkDocRef, {
-          chunkIndex: i,
-          data: chunkText
-        });
+      } else if (file.type.startsWith('image/') || fileDataStr.startsWith('data:image/')) {
+        try {
+          const thumb = await createImageThumbnail(fileDataStr, 800, 0.7);
+          if (thumb && thumb.length <= 350000) {
+            payload.fileData = thumb;
+          }
+        } catch {}
       }
     }
 
-    await setDoc(docRef, payload);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${FILES_COLLECTION}/${file.id}`);
+    // Set doc with 4s timeout to guarantee zero UI hanging even on bad networks or quota rate limits
+    const savePromise = setDoc(docRef, payload);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Firestore save timed out')), 4000)
+    );
+
+    await Promise.race([savePromise, timeoutPromise]);
+  } catch (error: any) {
+    if (isQuotaError(error)) {
+      markFirestoreQuotaExhausted();
+      console.warn('Firestore quota reached. Document is securely saved locally in IndexedDB.', error);
+      return;
+    }
+    console.warn('Firestore save non-fatal note:', error);
   }
 }
 
@@ -210,6 +259,9 @@ export async function fetchFileContentFromFirestore(fileId: string): Promise<str
 }
 
 export async function updateFileInFirestore(fileId: string, updates: Partial<StoredFile>): Promise<void> {
+  if (isFirestoreQuotaExhausted()) {
+    return;
+  }
   const docRef = doc(db, FILES_COLLECTION, fileId);
   try {
     const payload: Record<string, any> = {
@@ -217,12 +269,20 @@ export async function updateFileInFirestore(fileId: string, updates: Partial<Sto
       updatedAt: new Date().toISOString()
     };
     await updateDoc(docRef, payload);
-  } catch (error) {
+  } catch (error: any) {
+    if (isQuotaError(error)) {
+      markFirestoreQuotaExhausted();
+      console.warn('Firestore quota reached during update. Changes saved locally in IndexedDB.');
+      return;
+    }
     handleFirestoreError(error, OperationType.UPDATE, `${FILES_COLLECTION}/${fileId}`);
   }
 }
 
 export async function deleteFileFromFirestore(fileId: string): Promise<void> {
+  if (isFirestoreQuotaExhausted()) {
+    return;
+  }
   const docRef = doc(db, FILES_COLLECTION, fileId);
   try {
     // Delete any subcollection chunks first
@@ -235,7 +295,12 @@ export async function deleteFileFromFirestore(fileId: string): Promise<void> {
     } catch {}
 
     await deleteDoc(docRef);
-  } catch (error) {
+  } catch (error: any) {
+    if (isQuotaError(error)) {
+      markFirestoreQuotaExhausted();
+      console.warn('Firestore quota reached during delete. Item removed locally in IndexedDB.');
+      return;
+    }
     handleFirestoreError(error, OperationType.DELETE, `${FILES_COLLECTION}/${fileId}`);
   }
 }
@@ -249,6 +314,10 @@ export async function getFileFromFirestore(fileId: string): Promise<StoredFile |
     }
     return null;
   } catch (error) {
+    if (isQuotaError(error)) {
+      markFirestoreQuotaExhausted();
+      return null;
+    }
     handleFirestoreError(error, OperationType.GET, `${FILES_COLLECTION}/${fileId}`);
   }
 }
@@ -271,8 +340,13 @@ export function subscribeToFiles(
     },
     (error) => {
       console.warn('Files snapshot error:', error);
+      if (isQuotaError(error)) {
+        markFirestoreQuotaExhausted();
+      }
       if (onError) onError(error);
-      handleFirestoreError(error, OperationType.LIST, FILES_COLLECTION);
+      if (!isQuotaError(error)) {
+        handleFirestoreError(error, OperationType.LIST, FILES_COLLECTION);
+      }
     }
   );
 }

@@ -196,3 +196,49 @@ export function readFileAsDataURL(file: File): Promise<string> {
 export function getSampleFiles(): StoredFile[] {
   return [];
 }
+
+export async function createImageThumbnail(dataUrl: string, maxDimension = 800, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+      resolve('');
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let width = img.width;
+        let height = img.height;
+        if (width <= maxDimension && height <= maxDimension && dataUrl.length < 300000) {
+          resolve(dataUrl);
+          return;
+        }
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve('');
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const thumb = canvas.toDataURL('image/jpeg', quality);
+        resolve(thumb);
+      } catch {
+        resolve('');
+      }
+    };
+    img.onerror = () => resolve('');
+    img.src = dataUrl;
+  });
+}
