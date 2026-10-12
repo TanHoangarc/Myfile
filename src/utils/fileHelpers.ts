@@ -150,12 +150,27 @@ export function detectMimeType(fileName: string, providedType?: string): string 
 
 export function getCategoryLabel(category: FileCategory): string {
   switch (category) {
-    case 'contract': return 'Hợp đồng';
-    case 'id_card': return 'Giấy tờ tùy thân';
-    case 'certificate':
-    case 'invoice':
-    case 'report':
+    case 'template': return '1. File mẫu';
+    case 'contract': return '2. Hợp đồng';
+    case 'id_card':
+    case 'certificate': return '3. Giấy tờ tuỳ thân';
     case 'other':
+    case 'report': return '4. Tài liệu khác';
+    case 'invoice': return '5. Hoá đơn quyết toán';
+    default:
+      return '4. Tài liệu khác';
+  }
+}
+
+export function getCleanCategoryName(category: FileCategory): string {
+  switch (category) {
+    case 'template': return 'File mẫu';
+    case 'contract': return 'Hợp đồng';
+    case 'id_card':
+    case 'certificate': return 'Giấy tờ tuỳ thân';
+    case 'other':
+    case 'report': return 'Tài liệu khác';
+    case 'invoice': return 'Hoá đơn quyết toán';
     default:
       return 'Tài liệu khác';
   }
@@ -167,7 +182,7 @@ export function downloadFile(file: StoredFile): void {
 
     if (!url) {
       // If no data URL is attached, generate a descriptive text blob
-      const content = `TÊN TÀI LIỆU: ${file.name}\nLOẠI: ${getCategoryLabel(file.category)}\nNGÀY TẢI LÊN: ${formatDateVN(file.createdAt)}\nHẠN HIỆU LỰC: ${file.expiresAt ? formatDateVN(file.expiresAt) : 'Vô thời hạn'}\nGHI CHÚ: ${file.notes || 'Không có'}\n\nNội dung tệp đã được bảo mật lưu trữ trên MyFile.`;
+      const content = `TÊN TÀI LIỆU: ${file.name}\nNHÓM TÀI LIỆU: ${getCleanCategoryName(file.category)}\nTHƯ MỤC CON: ${file.subfolder || 'Mặc định'}\nNGÀY TẢI LÊN: ${formatDateVN(file.createdAt)}\nHẠN HIỆU LỰC: ${file.expiresAt ? formatDateVN(file.expiresAt) : 'Vô thời hạn'}\nGHI CHÚ: ${file.notes || 'Không có'}\n\nNội dung tệp đã được bảo mật lưu trữ trên MyFile.`;
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       url = URL.createObjectURL(blob);
     }
@@ -192,7 +207,74 @@ export function readFileAsDataURL(file: File): Promise<string> {
   });
 }
 
-// Sample files list is empty so user can add their own files
+// Starter files representation for the 5 main folders
 export function getSampleFiles(): StoredFile[] {
-  return [];
+  const now = new Date();
+  const nextMonth = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const nextWeek = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const nextYear = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  return [
+    {
+      id: 'demo-template-1',
+      name: 'Mẫu hợp đồng lao động chuẩn 2026.docx',
+      originalName: 'Mau_hop_dong_lao_dong_2026.docx',
+      size: 48500,
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      category: 'template',
+      subfolder: 'Mẫu hợp đồng',
+      notes: 'Mẫu chuẩn ban hành áp dụng cho nhân sự khối văn phòng',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'demo-contract-1',
+      name: 'Hợp đồng thuê mặt bằng văn phòng 2026.pdf',
+      originalName: 'Hop_dong_thue_van_phong_2026.pdf',
+      size: 142000,
+      type: 'application/pdf',
+      category: 'contract',
+      subfolder: 'Hợp đồng kinh tế',
+      validFrom: '2026-01-01',
+      expiresAt: nextMonth,
+      notes: 'Hợp đồng thuê sàn văn phòng tầng 8, thanh toán 3 tháng/lần',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'demo-id-1',
+      name: 'CCCD gắn chip - Giám đốc đại diện.jpg',
+      originalName: 'CCCD_NguyenVanA.jpg',
+      size: 215000,
+      type: 'image/jpeg',
+      category: 'id_card',
+      subfolder: 'CCCD / Hộ chiếu',
+      validFrom: '2024-05-10',
+      expiresAt: nextYear,
+      notes: 'Bản quét 2 mặt rõ nét phục vụ mở tài khoản ngân hàng và ký số',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'demo-other-1',
+      name: 'Biên bản bàn giao trang thiết bị IT.pdf',
+      originalName: 'Bien_ban_ban_giao_IT.pdf',
+      size: 89000,
+      type: 'application/pdf',
+      category: 'other',
+      subfolder: 'Biên bản bàn giao',
+      notes: 'Bàn giao laptop MacBook và màn hình Dell cho bộ phận kỹ thuật',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'demo-invoice-1',
+      name: 'Hoá đơn VAT xăng xe & công tác phí Q1-2026.pdf',
+      originalName: 'Hoa_don_VAT_xang_xe_Q1.pdf',
+      size: 96000,
+      type: 'application/pdf',
+      category: 'invoice',
+      subfolder: 'Hoá đơn VAT / Điện tử',
+      validFrom: '2026-03-01',
+      expiresAt: nextWeek,
+      notes: 'Hóa đơn điện tử số 0048291 cần hoàn tất quyết toán tài chính',
+      createdAt: new Date().toISOString()
+    }
+  ];
 }

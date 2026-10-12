@@ -143,6 +143,7 @@ export async function saveFileToFirestore(file: StoredFile): Promise<void> {
 
     if (file.validFrom) payload.validFrom = file.validFrom;
     if (file.expiresAt) payload.expiresAt = file.expiresAt;
+    if (file.subfolder) payload.subfolder = file.subfolder;
     if (file.notes) payload.notes = file.notes;
     if (file.tags && file.tags.length > 0) payload.tags = file.tags;
     if (file.uploader) payload.uploader = file.uploader;

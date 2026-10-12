@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   Copy,
   Check,
-  RefreshCw
+  RefreshCw,
+  FolderInput
 } from 'lucide-react';
 import type { StoredFile } from '../types/index.ts';
 import { 
@@ -25,8 +26,10 @@ import {
   calculateExpirationInfo, 
   downloadFile 
 } from '../utils/fileHelpers.ts';
+import { MAIN_FOLDERS, normalizeCategory, getFolderDefinition } from '../utils/folderConstants.ts';
 import { retrieveFileContent, storeFileContent, dataUrlToBlobUrl } from '../utils/fileStorage.ts';
 import { fetchFileContentFromFirestore } from '../firebase.ts';
+import type { FileCategory } from '../types/index.ts';
 
 interface FileViewerPanelProps {
   file: StoredFile | null;
@@ -36,6 +39,8 @@ interface FileViewerPanelProps {
   onDeleteFile: (file: StoredFile) => void;
   onBackToList?: () => void; // Mobile back button
   onFileDataLoaded?: (fileId: string, dataUrl: string) => void;
+  onUpdateCategory?: (fileId: string, category: FileCategory) => void;
+  onOpenMoveFolder?: (file: StoredFile) => void;
 }
 
 export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
@@ -45,13 +50,16 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
   onExtendValidity,
   onDeleteFile,
   onBackToList,
-  onFileDataLoaded
+  onFileDataLoaded,
+  onUpdateCategory,
+  onOpenMoveFolder
 }) => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [loadedDataUrl, setLoadedDataUrl] = useState<string>('');
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [showFolderDropdown, setShowFolderDropdown] = useState(false);
 
   // Load fileData from: 1) file.fileData, 2) IndexedDB, 3) Firebase Firestore
   useEffect(() => {
@@ -263,6 +271,61 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
             </h2>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
               <span className="font-mono">{formatFileSize(file.size)}</span>
+              <span>•</span>
+              
+              {/* Interactive Folder & Subfolder Selector Badge */}
+              <div className="relative inline-block">
+                {(() => {
+                  const folderDef = getFolderDefinition(file.category);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenMoveFolder) {
+                          onOpenMoveFolder(file);
+                        } else {
+                          setShowFolderDropdown(!showFolderDropdown);
+                        }
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-semibold text-[11px] border flex items-center gap-1 transition-all ${folderDef.badgeBg} ${folderDef.badgeText} ${folderDef.badgeBorder} hover:opacity-90`}
+                      title="Nhấn để đổi thư mục & thư mục con"
+                    >
+                      <span>📁 {folderDef.number}. {folderDef.name}</span>
+                      {file.subfolder && <span className="font-medium text-slate-700">/ {file.subfolder}</span>}
+                      <span className="text-[9px] opacity-60">▾</span>
+                    </button>
+                  );
+                })()}
+
+                {showFolderDropdown && onUpdateCategory && !onOpenMoveFolder && (
+                  <div className="absolute left-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+                      Chuyển sang nhóm
+                    </div>
+                    {MAIN_FOLDERS.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => {
+                          onUpdateCategory(file.id, f.id);
+                          setShowFolderDropdown(false);
+                        }}
+                        className={`w-full px-2.5 py-1.5 text-left text-xs flex items-center justify-between hover:bg-slate-50 transition-colors ${
+                          normalizeCategory(file.category) === f.id
+                            ? 'text-blue-600 font-bold bg-blue-50/50'
+                            : 'text-slate-700'
+                        }`}
+                      >
+                        <span>{f.number}. {f.name}</span>
+                        {normalizeCategory(file.category) === f.id && (
+                          <Check className="w-3.5 h-3.5 text-blue-600" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {expInfo && (
                 <>
                   <span>•</span>

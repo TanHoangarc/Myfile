@@ -1,10 +1,11 @@
 export type FileCategory = 
-  | 'contract'    // Hợp đồng
-  | 'certificate' // Chứng chỉ / Bằng cấp
-  | 'invoice'     // Hóa đơn / Chứng từ
-  | 'id_card'     // Giấy tờ tùy thân / CCCD
-  | 'report'      // Báo cáo / Đề án
-  | 'other';      // Tài liệu khác
+  | 'template'    // 1. File mẫu
+  | 'contract'    // 2. Hợp đồng
+  | 'id_card'     // 3. Giấy tờ tuỳ thân / CCCD
+  | 'other'       // 4. Tài liệu khác
+  | 'invoice'     // 5. Hoá đơn quyết toán
+  | 'certificate' // Hỗ trợ tương thích cũ -> nhóm Giấy tờ tuỳ thân
+  | 'report';     // Hỗ trợ tương thích cũ -> nhóm Tài liệu khác
 
 export type ExpirationStatus = 
   | 'active'        // Còn hiệu lực (> warning threshold)
@@ -19,6 +20,7 @@ export interface StoredFile {
   size: number;
   type: string;
   category: FileCategory;
+  subfolder?: string; // Thư mục con trong nhóm (VD: Mẫu biên bản, Hợp đồng dịch vụ...)
   fileData?: string; // Base64 data URL, plain text, or blob reference
   hasChunks?: boolean; // Whether content is split across Firestore chunks
   chunkCount?: number;

@@ -11,14 +11,21 @@ import {
   Square, 
   ChevronDown,
   Plus,
-  HardDrive
+  HardDrive,
+  FolderOpen,
+  Folder,
+  MoveRight,
+  FolderInput,
+  Tag,
+  X
 } from 'lucide-react';
-import type { StoredFile } from '../types/index.ts';
+import type { StoredFile, FileCategory } from '../types/index.ts';
 import { 
   formatFileSize, 
   formatDateVN, 
   calculateExpirationInfo 
 } from '../utils/fileHelpers.ts';
+import { MAIN_FOLDERS, normalizeCategory, getFolderDefinition } from '../utils/folderConstants.ts';
 
 interface FileListProps {
   files: StoredFile[];
@@ -27,6 +34,9 @@ interface FileListProps {
   warningDaysThreshold: number;
   currentStatusFilter: string;
   onFilterChange: (filter: string) => void;
+  selectedCategory: FileCategory | 'all';
+  selectedSubfolder: string | null;
+  onSelectFolder: (category: FileCategory | 'all', subfolder?: string | null) => void;
   onDownloadFile: (file: StoredFile) => void;
   onDeleteFile: (file: StoredFile) => void;
   onOpenZaloShare: (file: StoredFile) => void;
@@ -34,6 +44,8 @@ interface FileListProps {
   onBatchDelete: (fileIds: string[]) => void;
   onBatchDownload: (files: StoredFile[]) => void;
   onOpenUpload: () => void;
+  onMoveFile?: (fileId: string, targetCategory: FileCategory, targetSubfolder?: string) => void;
+  onOpenMoveFolder?: (file: StoredFile) => void;
 }
 
 export const FileList: React.FC<FileListProps> = ({
@@ -43,21 +55,43 @@ export const FileList: React.FC<FileListProps> = ({
   warningDaysThreshold,
   currentStatusFilter,
   onFilterChange,
+  selectedCategory,
+  selectedSubfolder,
+  onSelectFolder,
   onDownloadFile,
   onDeleteFile,
   onOpenZaloShare,
   onExtendValidity,
   onBatchDelete,
   onBatchDownload,
-  onOpenUpload
+  onOpenUpload,
+  onMoveFile,
+  onOpenMoveFolder
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'expiry_asc' | 'created_desc' | 'name_asc' | 'size_desc'>('expiry_asc');
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [fileToDelete, setFileToDelete] = useState<StoredFile | null>(null);
+  const [movingFileId, setMovingFileId] = useState<string | null>(null);
 
-  // Filter logic
+  // Active folder definition if filtering by category
+  const activeFolderDef = selectedCategory !== 'all' 
+    ? getFolderDefinition(selectedCategory) 
+    : null;
+
+  // Filter logic: Search + Status + Category + Subfolder
   const filteredFiles = files.filter((file) => {
+    // Category filter
+    if (selectedCategory !== 'all') {
+      const norm = normalizeCategory(file.category);
+      if (norm !== selectedCategory) return false;
+    }
+
+    // Subfolder filter
+    if (selectedSubfolder) {
+      if (file.subfolder?.trim() !== selectedSubfolder.trim()) return false;
+    }
+
     // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -65,7 +99,8 @@ export const FileList: React.FC<FileListProps> = ({
       const matchNotes = file.notes?.toLowerCase().includes(q);
       const matchTags = file.tags?.some((t) => t.toLowerCase().includes(q));
       const matchUploader = file.uploader?.toLowerCase().includes(q);
-      if (!matchName && !matchNotes && !matchTags && !matchUploader) return false;
+      const matchSub = file.subfolder?.toLowerCase().includes(q);
+      if (!matchName && !matchNotes && !matchTags && !matchUploader && !matchSub) return false;
     }
 
     // Expiration status filter
@@ -149,6 +184,33 @@ export const FileList: React.FC<FileListProps> = ({
           </button>
         </div>
 
+        {/* Active Folder Filter Banner */}
+        {activeFolderDef && (
+          <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50/70 border border-blue-200/80 text-xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <FolderOpen className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="text-slate-500">Thư mục:</span>
+              <strong className="text-blue-900 truncate">
+                {activeFolderDef.number}. {activeFolderDef.name}
+              </strong>
+              {selectedSubfolder && (
+                <>
+                  <span className="text-slate-400">/</span>
+                  <span className="text-blue-700 font-medium truncate">{selectedSubfolder}</span>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => onSelectFolder('all', null)}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-blue-100/60 shrink-0"
+            >
+              <span>Xem tất cả</span>
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
         {/* Search Bar & Sort Dropdown */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -157,7 +219,7 @@ export const FileList: React.FC<FileListProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tên tệp, ghi chú..."
+              placeholder="Tìm tên tệp, ghi chú, thư mục con..."
               className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
             />
             {searchQuery && (
@@ -246,12 +308,23 @@ export const FileList: React.FC<FileListProps> = ({
               <FileText className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-800">Chưa có tài liệu nào</p>
+              <p className="text-sm font-bold text-slate-800">Không tìm thấy tài liệu phù hợp</p>
               <p className="text-xs text-slate-500 mt-1">
-                {searchQuery ? `Không tìm thấy tài liệu phù hợp với "${searchQuery}"` : 'Danh sách tài liệu của bạn đang trống.'}
+                {selectedCategory !== 'all' 
+                  ? `Thư mục "${activeFolderDef?.name}" hiện chưa có tài liệu nào.` 
+                  : searchQuery 
+                    ? `Không tìm thấy kết quả cho "${searchQuery}".` 
+                    : 'Danh sách tài liệu của bạn đang trống.'}
               </p>
             </div>
-            {!searchQuery && (
+            {selectedCategory !== 'all' ? (
+              <button
+                onClick={() => onSelectFolder('all', null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+              >
+                Hiển thị tất cả tài liệu
+              </button>
+            ) : (
               <button
                 onClick={onOpenUpload}
                 className="mt-1 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs inline-flex items-center gap-1.5 transition-all active:scale-98"
@@ -266,12 +339,19 @@ export const FileList: React.FC<FileListProps> = ({
             const isSelected = file.id === selectedFileId;
             const isChecked = selectedBatchIds.includes(file.id);
             const expInfo = calculateExpirationInfo(file.expiresAt, warningDaysThreshold);
+            const folderDef = getFolderDefinition(file.category);
+            const isMovingThis = movingFileId === file.id;
 
             return (
               <div
                 key={file.id}
+                draggable={true}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', file.id);
+                  e.dataTransfer.setData('application/file-id', file.id);
+                }}
                 onClick={() => onSelectFile(file)}
-                className={`p-3 rounded-xl border transition-all cursor-pointer group flex flex-col gap-1.5 ${
+                className={`p-3 rounded-xl border transition-all cursor-pointer group flex flex-col gap-1.5 relative ${
                   isSelected
                     ? 'bg-blue-50/80 border-blue-500 shadow-2xs ring-2 ring-blue-500/20'
                     : 'bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/60'
@@ -301,8 +381,33 @@ export const FileList: React.FC<FileListProps> = ({
                       >
                         {file.name}
                       </h4>
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
                         <span className="font-mono">{formatFileSize(file.size)}</span>
+                        <span>•</span>
+                        {/* Folder Badge */}
+                        <span 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectFolder(folderDef.id, null);
+                          }}
+                          className={`px-1.5 py-0.2 rounded font-semibold text-[10.5px] border hover:opacity-80 transition-opacity ${folderDef.badgeBg} ${folderDef.badgeText} ${folderDef.badgeBorder}`}
+                          title={`Thuộc nhóm ${folderDef.number}. ${folderDef.name}`}
+                        >
+                          📁 {folderDef.number}. {folderDef.shortName}
+                        </span>
+                        {/* Subfolder tag if present */}
+                        {file.subfolder && (
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectFolder(folderDef.id, file.subfolder);
+                            }}
+                            className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-medium truncate max-w-[120px]"
+                            title={`Thư mục con: ${file.subfolder}`}
+                          >
+                            / {file.subfolder}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -322,6 +427,24 @@ export const FileList: React.FC<FileListProps> = ({
 
                   {/* Hover Quick Action Icons */}
                   <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                    
+                    {/* Move Folder Button */}
+                    {(onOpenMoveFolder || onMoveFile) && (
+                      <button
+                        onClick={() => {
+                          if (onOpenMoveFolder) {
+                            onOpenMoveFolder(file);
+                          } else {
+                            setMovingFileId(isMovingThis ? null : file.id);
+                          }
+                        }}
+                        className={`p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-200 transition-colors ${isMovingThis ? 'bg-blue-100 text-blue-700' : ''}`}
+                        title="Chuyển thư mục & chọn thư mục con"
+                      >
+                        <FolderInput className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     <button
                       onClick={() => onOpenZaloShare(file)}
                       className="p-1 rounded text-blue-600 hover:bg-blue-100"
@@ -352,6 +475,45 @@ export const FileList: React.FC<FileListProps> = ({
                     </button>
                   </div>
                 </div>
+
+                {/* Inline Quick Move Popover */}
+                {isMovingThis && (
+                  <div 
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-2.5 bg-slate-50 border border-blue-200 rounded-xl space-y-2 mt-1 animate-in fade-in"
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                      <span>Chuyển vào thư mục:</span>
+                      <button 
+                        onClick={() => setMovingFileId(null)}
+                        className="text-slate-400 hover:text-slate-600 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {MAIN_FOLDERS.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => {
+                            if (onMoveFile) {
+                              onMoveFile(file.id, f.id);
+                              setMovingFileId(null);
+                            }
+                          }}
+                          className={`px-2 py-1.5 rounded-lg text-left text-[11px] border transition-all ${
+                            normalizeCategory(file.category) === f.id
+                              ? 'bg-blue-600 text-white font-bold border-blue-600'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <span className="font-mono text-[10px] opacity-70">{f.number}.</span> {f.shortName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
               </div>
             );

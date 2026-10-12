@@ -4,7 +4,11 @@ import {
   LogIn, 
   LogOut, 
   CheckCircle2, 
-  FolderLock
+  FolderLock,
+  Cloud,
+  CloudUpload,
+  RefreshCw,
+  ArrowRightLeft
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 
@@ -19,6 +23,10 @@ interface NavbarProps {
   onToggleNotificationDrawer: () => void;
   isNotificationDrawerOpen: boolean;
   totalFiles: number;
+  unsyncedCount?: number;
+  isSyncingCloud?: boolean;
+  onSyncAll?: () => void;
+  onOpenMigration?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -29,7 +37,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   expiredCount,
   onToggleNotificationDrawer,
   isNotificationDrawerOpen,
-  totalFiles
+  totalFiles,
+  unsyncedCount = 0,
+  isSyncingCloud = false,
+  onSyncAll,
+  onOpenMigration
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const totalAlerts = expiringCount + expiredCount;
@@ -55,6 +67,47 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
+
+          {/* Data Migration between Machine A & Machine B */}
+          {onOpenMigration && (
+            <button
+              onClick={onOpenMigration}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-semibold text-xs transition-all shadow-2xs active:scale-98"
+              title="Giải thích và chuyển toàn bộ tệp giữa Máy A và Máy B"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="hidden sm:inline">Chuyển sang Máy B</span>
+              <span className="sm:hidden">Chuyển máy</span>
+            </button>
+          )}
+
+          {/* Cloud Sync Status / Button */}
+          {onSyncAll && (
+            unsyncedCount > 0 ? (
+              <button
+                onClick={onSyncAll}
+                disabled={isSyncingCloud}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold text-xs transition-all shadow-2xs active:scale-98 disabled:opacity-50"
+                title="Bấm để đồng bộ các tệp lưu trong máy lên Firebase Cloud"
+              >
+                {isSyncingCloud ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                ) : (
+                  <CloudUpload className="w-3.5 h-3.5 text-blue-600" />
+                )}
+                <span>{isSyncingCloud ? 'Đang đồng bộ...' : `Đồng bộ Firebase (${unsyncedCount})`}</span>
+              </button>
+            ) : totalFiles > 0 ? (
+              <button
+                onClick={onSyncAll}
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-medium text-xs transition-colors"
+                title="Đã đồng bộ toàn bộ tệp với Firebase Cloud. Bấm để kiểm tra đồng bộ lại."
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Đã đồng bộ Cloud</span>
+              </button>
+            ) : null
+          )}
           
           {/* Expiration Notification Bell */}
           <div className="relative">

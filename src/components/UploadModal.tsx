@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, 
   Upload, 
@@ -6,11 +6,13 @@ import {
   AlignLeft, 
   Check, 
   AlertCircle,
-  FileCheck
+  FileCheck,
+  FolderOpen
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import type { StoredFile, FileCategory } from '../types/index.ts';
 import { formatFileSize, readFileAsDataURL, detectMimeType } from '../utils/fileHelpers.ts';
+import { MAIN_FOLDERS, normalizeCategory } from '../utils/folderConstants.ts';
 import { playAlertSound } from '../utils/notificationService.ts';
 import { storeFileContent } from '../utils/fileStorage.ts';
 
@@ -19,17 +21,22 @@ interface UploadModalProps {
   onClose: () => void;
   onSaveFile: (file: StoredFile) => Promise<void>;
   currentUser: User | null;
+  initialCategory?: FileCategory;
+  initialSubfolder?: string;
 }
 
 export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
   onSaveFile,
-  currentUser
+  currentUser,
+  initialCategory = 'contract',
+  initialSubfolder = ''
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
-  const [category, setCategory] = useState<FileCategory>('contract');
+  const [category, setCategory] = useState<FileCategory>(initialCategory);
+  const [subfolder, setSubfolder] = useState<string>(initialSubfolder);
   const [validFrom, setValidFrom] = useState(() => new Date().toISOString().split('T')[0]);
   const [expiresAt, setExpiresAt] = useState('');
   const [hasNoExpiration, setHasNoExpiration] = useState(false);
@@ -39,6 +46,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      setCategory(initialCategory);
+      setSubfolder(initialSubfolder || '');
+    }
+  }, [isOpen, initialCategory, initialSubfolder]);
+
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,12 +61,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSelectedFile(file);
       setFileName(file.name);
 
-      // Auto detect category
+      // Auto detect category based on keywords
       const lower = file.name.toLowerCase();
-      if (lower.includes('hop-dong') || lower.includes('hopdong') || lower.includes('contract')) {
+      if (lower.includes('mau') || lower.includes('template') || lower.includes('bieu-mau') || lower.includes('don-xin')) {
+        setCategory('template');
+      } else if (lower.includes('hop-dong') || lower.includes('hopdong') || lower.includes('contract') || lower.includes('thoa-thuan')) {
         setCategory('contract');
-      } else if (lower.includes('cccd') || lower.includes('cmnd') || lower.includes('passport') || lower.includes('giay-to') || lower.includes('id')) {
+      } else if (lower.includes('cccd') || lower.includes('cmnd') || lower.includes('passport') || lower.includes('ho-chieu') || lower.includes('bang-lai') || lower.includes('giay-to') || lower.includes('id')) {
         setCategory('id_card');
+      } else if (lower.includes('hoa-don') || lower.includes('invoice') || lower.includes('vat') || lower.includes('quyet-toan') || lower.includes('bien-lai') || lower.includes('phieu-chi')) {
+        setCategory('invoice');
       } else {
         setCategory('other');
       }
@@ -103,6 +121,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         size: selectedFile.size,
         type: detectMimeType(selectedFile.name, selectedFile.type),
         category,
+        subfolder: subfolder.trim() || undefined,
         fileData,
         validFrom: validFrom || undefined,
         expiresAt: hasNoExpiration ? undefined : (expiresAt || undefined),
@@ -228,31 +247,93 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             />
           </div>
 
-          {/* Category Selection: Exactly 3 items */}
+          {/* Category Selection: 5 Main Folders */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Phân loại danh mục
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'contract', label: 'Hợp đồng' },
-                { id: 'id_card', label: 'Giấy tờ tùy thân' },
-                { id: 'other', label: 'Tài liệu khác' }
-              ].map((cat) => (
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                Nhóm tài liệu (Thư mục chính)
+              </label>
+              <span className="text-[11px] text-blue-600 font-medium">5 thư mục chính</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {MAIN_FOLDERS.map((folder) => {
+                const isSelected = category === folder.id;
+                return (
+                  <button
+                    type="button"
+                    key={folder.id}
+                    onClick={() => {
+                      setCategory(folder.id);
+                      // Reset or suggest default subfolder
+                      if (folder.defaultSubfolders.length > 0 && !subfolder) {
+                        setSubfolder(folder.defaultSubfolders[0]);
+                      }
+                    }}
+                    className={`p-2.5 rounded-xl text-left transition-all border flex flex-col justify-between ${
+                      isSelected
+                        ? `${folder.badgeBg} ${folder.badgeText} ring-2 ring-blue-500/30 border-blue-500 shadow-2xs font-bold`
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="font-mono text-[11px] opacity-70">{folder.number}.</span>
+                      <span className="truncate">{folder.name}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-normal truncate mt-0.5">
+                      {folder.defaultSubfolders[0]}...
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Subfolder Selection (Thư mục con) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5 text-blue-600" />
+                <span>Thư mục con (Tùy chọn)</span>
+              </label>
+              {subfolder && (
                 <button
                   type="button"
-                  key={cat.id}
-                  onClick={() => setCategory(cat.id as FileCategory)}
-                  className={`px-3 py-2.5 rounded-xl text-xs text-center transition-all border ${
-                    category === cat.id
-                      ? 'bg-blue-50 text-blue-700 border-blue-500 shadow-2xs font-bold ring-2 ring-blue-500/20'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 font-medium'
-                  }`}
+                  onClick={() => setSubfolder('')}
+                  className="text-[10px] text-slate-400 hover:text-rose-500"
                 >
-                  {cat.label}
+                  Xóa thư mục con
                 </button>
-              ))}
+              )}
             </div>
+
+            <input
+              type="text"
+              value={subfolder}
+              onChange={(e) => setSubfolder(e.target.value)}
+              placeholder="VD: Mẫu hợp đồng, Hợp đồng kinh tế, CCCD 2 mặt..."
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            />
+
+            {/* Quick suggested subfolders based on current category */}
+            {category && MAIN_FOLDERS.find((f) => f.id === category)?.defaultSubfolders && (
+              <div className="flex flex-wrap gap-1 items-center pt-1">
+                <span className="text-[10px] text-slate-400">Gợi ý:</span>
+                {MAIN_FOLDERS.find((f) => f.id === category)?.defaultSubfolders.map((tag) => (
+                  <button
+                    type="button"
+                    key={tag}
+                    onClick={() => setSubfolder(tag)}
+                    className={`text-[10.5px] px-2 py-0.5 rounded-md border transition-all ${
+                      subfolder === tag
+                        ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Validity Period & Expiration (without quick presets) */}
