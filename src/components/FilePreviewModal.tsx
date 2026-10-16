@@ -24,6 +24,7 @@ import {
   getCategoryLabel, 
   downloadFile 
 } from '../utils/fileHelpers.ts';
+import { DocxViewer } from './DocxViewer.tsx';
 
 interface FilePreviewModalProps {
   file: StoredFile | null;
@@ -44,9 +45,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   if (!file) return null;
 
   const expInfo = calculateExpirationInfo(file.expiresAt);
-  const isImage = file.type.startsWith('image/');
-  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  const isText = file.type.startsWith('text/') || file.type.includes('json') || file.type.includes('csv');
+  const lowerName = file.name.toLowerCase();
+  const isDocx = /\.docx$/i.test(lowerName) || file.type.includes('wordprocessingml') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|svg|bmp)$/i.test(lowerName);
+  const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
+  const isText = !isDocx && (file.type.startsWith('text/') || file.type.includes('json') || file.type.includes('csv'));
   const isAudio = file.type.startsWith('audio/');
   const isVideo = file.type.startsWith('video/');
 
@@ -140,8 +143,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           {/* Main Viewer Canvas */}
           <div className="flex-1 flex flex-col overflow-hidden relative">
             
-            {/* Viewer Controls for Image */}
-            {isImage && (
+            {/* Viewer Controls for Image and DOCX */}
+            {(isImage || isDocx) && (
               <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-md rounded-xl p-1 shadow-md border border-slate-200/80">
                 <button
                   onClick={handleZoomIn}
@@ -157,13 +160,15 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 >
                   <ZoomOut className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={handleRotate}
-                  className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
-                  title="Xoay hình ảnh"
-                >
-                  <RotateCw className="w-4 h-4" />
-                </button>
+                {isImage && (
+                  <button
+                    onClick={handleRotate}
+                    className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
+                    title="Xoay hình ảnh"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                  </button>
+                )}
                 <span className="text-xs font-medium text-slate-500 px-2">
                   {Math.round(zoomLevel * 100)}%
                 </span>
@@ -221,6 +226,13 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 </div>
               )}
 
+              {/* DOCX PREVIEW */}
+              {isDocx && (
+                <div className="w-full h-full overflow-y-auto flex justify-center p-2 sm:p-4 bg-slate-100/70">
+                  <DocxViewer file={file} dataUrl={file.fileData} zoomLevel={zoomLevel} />
+                </div>
+              )}
+
               {/* TEXT / CODE PREVIEW */}
               {isText && (
                 <div className="w-full h-full bg-slate-900 text-slate-100 rounded-xl p-5 font-mono text-xs overflow-auto shadow-inner">
@@ -249,7 +261,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               )}
 
               {/* OTHER FORMATS (Word, Excel, Zip, etc.) */}
-              {!isImage && !isPdf && !isText && !isAudio && !isVideo && (
+              {!isImage && !isPdf && !isDocx && !isText && !isAudio && !isVideo && (
                 <div className="bg-white p-8 rounded-2xl shadow-md border border-slate-200 text-center max-w-md space-y-4">
                   <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
                     <FileText className="w-8 h-8" />

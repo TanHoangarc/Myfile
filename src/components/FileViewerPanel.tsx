@@ -30,6 +30,7 @@ import { MAIN_FOLDERS, normalizeCategory, getFolderDefinition } from '../utils/f
 import { retrieveFileContent, storeFileContent, dataUrlToBlobUrl } from '../utils/fileStorage.ts';
 import { fetchFileContentFromFirestore } from '../firebase.ts';
 import type { FileCategory } from '../types/index.ts';
+import { DocxViewer } from './DocxViewer.tsx';
 
 interface FileViewerPanelProps {
   file: StoredFile | null;
@@ -128,6 +129,13 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
   // Extension & mime-type robust checking (computed unconditionally)
   const lowerName = file ? file.name.toLowerCase() : '';
   const effectiveData = loadedDataUrl || file?.fileData || '';
+
+  const isDocx = Boolean(file && (
+    /\.docx$/i.test(lowerName) || 
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+    file.type.includes('wordprocessingml') ||
+    (effectiveData && effectiveData.startsWith('data:application/vnd.openxmlformats-officedocument.wordprocessingml.document'))
+  ));
 
   const isImage = Boolean(file && (
     file.type.startsWith('image/') || 
@@ -255,8 +263,12 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
             </button>
           )}
 
-          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            {isImage ? (
+          <div className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shrink-0 shadow-xs ${
+            isDocx ? 'bg-blue-700' : isSpreadsheet || isCsv ? 'bg-emerald-600' : isPdf ? 'bg-rose-600' : 'bg-blue-600'
+          }`}>
+            {isDocx ? (
+              <span className="font-bold text-xs tracking-tight">DOCX</span>
+            ) : isImage ? (
               <ImageIcon className="w-5 h-5" />
             ) : isSpreadsheet || isCsv ? (
               <FileSpreadsheet className="w-5 h-5" />
@@ -340,8 +352,8 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
 
         {/* Action Toolbar */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Image Zoom & Rotate Controls directly in toolbar */}
-          {isImage && effectiveData && (
+          {/* Zoom Controls for Image & DOCX directly in toolbar */}
+          {(isImage || isDocx) && (
             <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 mr-1 shadow-2xs">
               <button
                 onClick={handleZoomIn}
@@ -357,13 +369,15 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={handleRotate}
-                className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                title="Xoay hình ảnh"
-              >
-                <RotateCw className="w-3.5 h-3.5" />
-              </button>
+              {isImage && (
+                <button
+                  onClick={handleRotate}
+                  className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  title="Xoay hình ảnh"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 onClick={handleResetZoom}
                 className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -464,6 +478,15 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
             <div className="text-center p-12 space-y-2 my-auto">
               <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
               <p className="text-xs text-slate-500 font-medium">Đang tải dữ liệu xem trước từ Firebase...</p>
+            </div>
+          ) : isDocx ? (
+            /* 1. DOCX WORD DOCUMENT PREVIEW */
+            <div className="w-full flex justify-center py-2">
+              <DocxViewer 
+                file={file} 
+                dataUrl={effectiveData} 
+                zoomLevel={zoomLevel} 
+              />
             </div>
           ) : isImage && effectiveData ? (
             /* 1. IMAGE VIEWER - Displayed vertically down like an authentic A4 document page */

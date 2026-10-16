@@ -406,6 +406,11 @@ export const FileList: React.FC<FileListProps> = ({
                         {file.name}
                       </h4>
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                        {/\.docx$/i.test(file.name) && (
+                          <span className="px-1.5 py-0.2 rounded font-bold text-[9.5px] bg-blue-100 text-blue-800 border border-blue-200">
+                            DOCX
+                          </span>
+                        )}
                         <span className="font-mono">{formatFileSize(file.size)}</span>
                         <span>•</span>
                         {/* Folder Badge */}

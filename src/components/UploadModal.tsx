@@ -238,7 +238,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   <span className="text-sm text-slate-600"> hoặc kéo thả vào đây</span>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Hỗ trợ PDF, Word, Excel, Hình ảnh (PNG/JPG), Văn bản,...
+                  Hỗ trợ Word (.docx xem trước trực tiếp), PDF, Excel, Ảnh (PNG/JPG), Văn bản,...
                 </p>
               </div>
             )}
