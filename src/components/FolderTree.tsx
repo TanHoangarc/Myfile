@@ -39,6 +39,7 @@ interface FolderTreeProps {
   onOpenUploadWithFolder?: (category: FileCategory, subfolder?: string) => void;
   onLoadSampleFiles?: () => void;
   onRenameSubfolder?: (category: FileCategory, oldSubfolder: string, newSubfolder: string) => void;
+  onRequestRenameSubfolder?: (category: FileCategory, subfolder: string) => void;
   onDeleteSubfolder?: (category: FileCategory, subfolder: string) => void;
 }
 
@@ -54,6 +55,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   onOpenUploadWithFolder,
   onLoadSampleFiles,
   onRenameSubfolder,
+  onRequestRenameSubfolder,
   onDeleteSubfolder
 }) => {
   // Track open/collapsed folders in the tree
@@ -122,8 +124,12 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
 
   const handleStartRename = (category: FileCategory, oldName: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setEditingSubfolder({ category, oldName });
-    setEditingValue(oldName);
+    if (onRequestRenameSubfolder) {
+      onRequestRenameSubfolder(category, oldName);
+    } else {
+      setEditingSubfolder({ category, oldName });
+      setEditingValue(oldName);
+    }
   };
 
   const handleSaveRename = (category: FileCategory, oldName: string) => {
@@ -397,14 +403,14 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                         e.stopPropagation();
                         onOpenUploadWithFolder(folder.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200/80 text-slate-500 hover:text-blue-600 transition-all"
+                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 sm:p-1 rounded hover:bg-slate-200/80 text-slate-500 hover:text-blue-600 transition-all"
                       title={`Tải tệp trực tiếp vào ${folder.name}`}
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   )}
 
-                  {/* Add Subfolder button on hover */}
+                  {/* Add Subfolder button */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -412,7 +418,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                       setAddingSubfolderFor(addingSubfolderFor === folder.id ? null : folder.id);
                       setNewSubfolderName('');
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200/80 text-slate-500 hover:text-blue-600 transition-all"
+                    className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 sm:p-1 rounded hover:bg-slate-200/80 text-slate-500 hover:text-blue-600 transition-all"
                     title="Thêm thư mục con"
                   >
                     <FolderPlus className="w-3.5 h-3.5" />
@@ -547,23 +553,23 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                           </div>
 
                           <div className="flex items-center gap-1 shrink-0 ml-1">
-                            {/* Hover Edit / Rename & Delete Buttons */}
-                            <div className="opacity-0 group-hover/sub:opacity-100 flex items-center gap-0.5 transition-opacity">
+                            {/* Edit / Rename & Delete Buttons: visible on mobile, hover on desktop */}
+                            <div className="opacity-80 sm:opacity-0 sm:group-hover/sub:opacity-100 flex items-center gap-0.5 transition-opacity">
                               <button
                                 type="button"
                                 onClick={(e) => handleStartRename(folder.id, subName, e)}
-                                className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-200 transition-colors"
+                                className="p-1.5 sm:p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-200 transition-colors"
                                 title="Đổi tên thư mục con"
                               >
-                                <Pencil className="w-3 h-3" />
+                                <Pencil className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                               </button>
                               <button
                                 type="button"
                                 onClick={(e) => handleDeleteSubfolderClick(folder.id, subName, e)}
-                                className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                className="p-1.5 sm:p-1 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                                 title="Xóa thư mục con"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                               </button>
                             </div>
 

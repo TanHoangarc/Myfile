@@ -17,7 +17,8 @@ import {
   MoveRight,
   FolderInput,
   Tag,
-  X
+  X,
+  Pencil
 } from 'lucide-react';
 import type { StoredFile, FileCategory } from '../types/index.ts';
 import { 
@@ -46,6 +47,8 @@ interface FileListProps {
   onOpenUpload: () => void;
   onMoveFile?: (fileId: string, targetCategory: FileCategory, targetSubfolder?: string) => void;
   onOpenMoveFolder?: (file: StoredFile) => void;
+  onRequestRenameSubfolder?: (category: FileCategory, subfolder: string) => void;
+  onSwitchToTreeMobile?: () => void;
 }
 
 export const FileList: React.FC<FileListProps> = ({
@@ -66,7 +69,9 @@ export const FileList: React.FC<FileListProps> = ({
   onBatchDownload,
   onOpenUpload,
   onMoveFile,
-  onOpenMoveFolder
+  onOpenMoveFolder,
+  onRequestRenameSubfolder,
+  onSwitchToTreeMobile
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'expiry_asc' | 'created_desc' | 'name_asc' | 'size_desc'>('expiry_asc');
@@ -186,28 +191,47 @@ export const FileList: React.FC<FileListProps> = ({
 
         {/* Active Folder Filter Banner */}
         {activeFolderDef && (
-          <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50/70 border border-blue-200/80 text-xs">
-            <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 p-2 rounded-xl bg-blue-50/70 border border-blue-200/80 text-xs">
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               <FolderOpen className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span className="text-slate-500">Thư mục:</span>
               <strong className="text-blue-900 truncate">
                 {activeFolderDef.number}. {activeFolderDef.name}
               </strong>
               {selectedSubfolder && (
-                <>
-                  <span className="text-slate-400">/</span>
-                  <span className="text-blue-700 font-medium truncate">{selectedSubfolder}</span>
-                </>
+                <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-blue-200 text-blue-700 font-semibold">
+                  <span className="truncate max-w-[130px]">{selectedSubfolder}</span>
+                  {onRequestRenameSubfolder && selectedCategory !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestRenameSubfolder(selectedCategory, selectedSubfolder)}
+                      className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition-colors"
+                      title="Đổi tên thư mục con này"
+                    >
+                      <Pencil className="w-3 h-3 text-blue-600" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
-            <button
-              onClick={() => onSelectFolder('all', null)}
-              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-blue-100/60 shrink-0"
-            >
-              <span>Xem tất cả</span>
-              <X className="w-3 h-3" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {onSwitchToTreeMobile && (
+                <button
+                  onClick={onSwitchToTreeMobile}
+                  className="lg:hidden text-[11px] font-semibold text-slate-600 hover:text-slate-900 px-2 py-0.5 rounded bg-white border border-slate-200"
+                >
+                  Cây thư mục
+                </button>
+              )}
+              <button
+                onClick={() => onSelectFolder('all', null)}
+                className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-blue-100/60 shrink-0"
+              >
+                <span>Tất cả</span>
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -425,8 +449,8 @@ export const FileList: React.FC<FileListProps> = ({
                     <span>Hạn: <strong className="text-slate-700">{formatDateVN(file.expiresAt)}</strong></span>
                   </div>
 
-                  {/* Hover Quick Action Icons */}
-                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                  {/* Mobile & Hover Quick Action Icons */}
+                  <div className="flex items-center gap-1 sm:gap-1.5 opacity-90 sm:opacity-80 sm:group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                     
                     {/* Move Folder Button */}
                     {(onOpenMoveFolder || onMoveFile) && (
@@ -438,7 +462,7 @@ export const FileList: React.FC<FileListProps> = ({
                             setMovingFileId(isMovingThis ? null : file.id);
                           }
                         }}
-                        className={`p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-200 transition-colors ${isMovingThis ? 'bg-blue-100 text-blue-700' : ''}`}
+                        className={`p-1.5 sm:p-1 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200 transition-colors ${isMovingThis ? 'bg-blue-100 text-blue-700' : ''}`}
                         title="Chuyển thư mục & chọn thư mục con"
                       >
                         <FolderInput className="w-3.5 h-3.5" />
@@ -447,31 +471,31 @@ export const FileList: React.FC<FileListProps> = ({
 
                     <button
                       onClick={() => onOpenZaloShare(file)}
-                      className="p-1 rounded text-blue-600 hover:bg-blue-100"
+                      className="p-1.5 sm:p-1 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors"
                       title="Gửi Zalo"
                     >
-                      <Share2 className="w-3 h-3" />
+                      <Share2 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                     </button>
                     <button
                       onClick={() => onExtendValidity(file)}
-                      className="p-1 rounded text-amber-600 hover:bg-amber-100"
+                      className="p-1.5 sm:p-1 rounded-lg text-amber-600 hover:bg-amber-100 transition-colors"
                       title="Gia hạn"
                     >
-                      <Clock className="w-3 h-3" />
+                      <Clock className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                     </button>
                     <button
                       onClick={() => onDownloadFile(file)}
-                      className="p-1 rounded text-slate-600 hover:bg-slate-200"
+                      className="p-1.5 sm:p-1 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors"
                       title="Tải về"
                     >
-                      <Download className="w-3 h-3" />
+                      <Download className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                     </button>
                     <button
                       onClick={() => setFileToDelete(file)}
-                      className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                      className="p-1.5 sm:p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                       title="Xóa tệp"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                     </button>
                   </div>
                 </div>

@@ -8,7 +8,8 @@ import {
   ExternalLink, 
   MessageSquare, 
   FileText, 
-  Download
+  Download,
+  Smartphone
 } from 'lucide-react';
 import type { StoredFile } from '../types/index.ts';
 import { 
@@ -36,9 +37,16 @@ export const ZaloShareModal: React.FC<ZaloShareModalProps> = ({
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [shareTab, setShareTab] = useState<'link' | 'qr' | 'message'>('link');
+  const [canNativeShare, setCanNativeShare] = useState(false);
 
   const shareUrl = getFileShareUrl(file?.id);
   const zaloMessage = generateZaloShareMessage(file || undefined);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      setCanNativeShare(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -64,13 +72,41 @@ export const ZaloShareModal: React.FC<ZaloShareModalProps> = ({
     setTimeout(() => setCopiedMessage(false), 2000);
   };
 
+  const handleNativeShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: file ? file.name : 'MyFile - Quản lý tài liệu',
+          text: zaloMessage,
+          url: shareUrl
+        });
+        playAlertSound('success');
+        if (onShared && file) onShared(file.id);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.warn('Native share error, fallback:', err);
+      }
+    }
+  };
+
   const handleOpenZalo = () => {
     openZaloShare(shareUrl, file?.name, zaloMessage);
     if (onShared && file) onShared(file.id);
   };
 
   const handleOpenZaloWeb = () => {
-    window.open(`https://chat.zalo.me/?url=${encodeURIComponent(shareUrl)}`, '_blank');
+    try {
+      const a = document.createElement('a');
+      a.href = `https://chat.zalo.me/?url=${encodeURIComponent(shareUrl)}`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.open(`https://chat.zalo.me/?url=${encodeURIComponent(shareUrl)}`, '_blank');
+    }
     if (onShared && file) onShared(file.id);
   };
 
@@ -175,8 +211,21 @@ export const ZaloShareModal: React.FC<ZaloShareModalProps> = ({
                 </div>
               </div>
 
+              {/* Native Mobile Share Button */}
+              {canNativeShare && (
+                <button
+                  type="button"
+                  onClick={handleNativeShare}
+                  className="w-full p-3.5 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition-all active:scale-98"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Mở chia sẻ ứng dụng điện thoại (Zalo, Tin nhắn, v.v.)</span>
+                  <Share2 className="w-3.5 h-3.5 ml-auto" />
+                </button>
+              )}
+
               {/* Action Buttons for Zalo */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <button
                   onClick={handleOpenZalo}
                   className="p-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all active:scale-98"

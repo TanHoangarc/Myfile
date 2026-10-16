@@ -33,6 +33,7 @@ export interface StoredFile {
   createdAt: string; // ISO string
   updatedAt?: string; // ISO string
   shareCount?: number;
+  isSyncedToCloud?: boolean;
 }
 
 export interface ExpirationInfo {

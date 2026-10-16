@@ -133,6 +133,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         shareCount: 0
       };
 
+      if (subfolder.trim()) {
+        try {
+          const raw = localStorage.getItem('docuvault_custom_subfolders_v1');
+          const custom = raw ? JSON.parse(raw) : {};
+          const list = custom[category] || [];
+          if (!list.includes(subfolder.trim())) {
+            custom[category] = [...list, subfolder.trim()];
+            localStorage.setItem('docuvault_custom_subfolders_v1', JSON.stringify(custom));
+          }
+        } catch {}
+      }
+
       await onSaveFile(newFile);
       playAlertSound('success');
       onClose();

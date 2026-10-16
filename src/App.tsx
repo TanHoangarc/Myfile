@@ -23,7 +23,8 @@ import {
   updateFileInFirestore, 
   deleteFileFromFirestore, 
   getFileFromFirestore, 
-  subscribeToFiles 
+  subscribeToFiles,
+  fetchFileContentFromFirestore 
 } from './firebase.ts';
 import type { StoredFile, FileCategory } from './types/index.ts';
 import { 
@@ -49,6 +50,7 @@ import { FolderTree } from './components/FolderTree.tsx';
 import { FileViewerPanel } from './components/FileViewerPanel.tsx';
 import { UploadModal } from './components/UploadModal.tsx';
 import { MoveFolderModal } from './components/MoveFolderModal.tsx';
+import { RenameSubfolderModal } from './components/RenameSubfolderModal.tsx';
 import { ZaloShareModal } from './components/ZaloShareModal.tsx';
 import { ExtendExpiryModal } from './components/ExtendExpiryModal.tsx';
 import { NotificationDrawer } from './components/NotificationDrawer.tsx';
@@ -86,6 +88,7 @@ export default function App() {
   // Modals & Drawers
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [fileToMove, setFileToMove] = useState<StoredFile | null>(null);
+  const [subfolderToRename, setSubfolderToRename] = useState<{ category: FileCategory; subfolder: string } | null>(null);
   const [zaloShareFile, setZaloShareFile] = useState<StoredFile | null>(null);
   const [isZaloShareOpen, setIsZaloShareOpen] = useState(false);
   const [extendFile, setExtendFile] = useState<StoredFile | null>(null);
@@ -336,12 +339,23 @@ export default function App() {
   const handleDownloadFile = async (file: StoredFile) => {
     let toDownload = file;
     if (!toDownload.fileData) {
-      const cached = await retrieveFileContent(file.id);
+      let cached = await retrieveFileContent(file.id);
+      if (!cached) {
+        try {
+          cached = await fetchFileContentFromFirestore(file.id);
+          if (cached) {
+            await storeFileContent(file.id, cached);
+          }
+        } catch (err) {
+          console.warn('Error fetching file content from Firestore for download:', err);
+        }
+      }
       if (cached) {
         toDownload = { ...file, fileData: cached };
       }
     }
     downloadFile(toDownload);
+    playAlertSound('success');
   };
 
   const handleBatchDownload = async (selectedFiles: StoredFile[]) => {
@@ -349,12 +363,19 @@ export default function App() {
       setTimeout(async () => {
         let toDown = file;
         if (!toDown.fileData) {
-          const cached = await retrieveFileContent(file.id);
+          let cached = await retrieveFileContent(file.id);
+          if (!cached) {
+            try {
+              cached = await fetchFileContentFromFirestore(file.id);
+              if (cached) await storeFileContent(file.id, cached);
+            } catch (err) {}
+          }
           if (cached) toDown = { ...file, fileData: cached };
         }
         downloadFile(toDown);
-      }, index * 300);
+      }, index * 350);
     });
+    playAlertSound('success');
   };
 
   const handleZaloShared = async (fileId?: string) => {
@@ -453,6 +474,17 @@ export default function App() {
     if (selectedCategory === category && selectedSubfolder === oldSubfolder) {
       setSelectedSubfolder(cleanNew);
     }
+
+    // 3. Update localStorage custom subfolder list
+    try {
+      const raw = localStorage.getItem('docuvault_custom_subfolders_v1');
+      const custom = raw ? JSON.parse(raw) : {};
+      const list: string[] = custom[category] || [];
+      const updatedList = list.map((item) => (item === cleanOld ? cleanNew : item));
+      if (!updatedList.includes(cleanNew)) updatedList.push(cleanNew);
+      custom[category] = updatedList;
+      localStorage.setItem('docuvault_custom_subfolders_v1', JSON.stringify(custom));
+    } catch {}
 
     playAlertSound('success');
   };
@@ -657,6 +689,7 @@ export default function App() {
                   onOpenUploadWithFolder={handleOpenUploadWithFolder}
                   onLoadSampleFiles={handleLoadSampleFiles}
                   onRenameSubfolder={handleRenameSubfolder}
+                  onRequestRenameSubfolder={(category, subfolder) => setSubfolderToRename({ category, subfolder })}
                   onDeleteSubfolder={handleDeleteSubfolder}
                 />
               </div>
@@ -687,6 +720,8 @@ export default function App() {
               onOpenUpload={() => handleOpenUploadWithFolder(selectedCategory !== 'all' ? selectedCategory : 'contract')}
               onMoveFile={handleMoveFile}
               onOpenMoveFolder={(file) => setFileToMove(file)}
+              onRequestRenameSubfolder={(category, subfolder) => setSubfolderToRename({ category, subfolder })}
+              onSwitchToTreeMobile={() => setMobileTab('tree')}
             />
           </div>
 
@@ -765,6 +800,15 @@ export default function App() {
         file={fileToMove}
         files={files}
         onConfirmMove={handleMoveFile}
+      />
+
+      {/* 2b. Rename Subfolder Modal */}
+      <RenameSubfolderModal
+        isOpen={!!subfolderToRename}
+        onClose={() => setSubfolderToRename(null)}
+        category={subfolderToRename?.category || 'contract'}
+        currentSubfolder={subfolderToRename?.subfolder || ''}
+        onConfirmRename={handleRenameSubfolder}
       />
 
       {/* 3. Zalo Share Modal */}

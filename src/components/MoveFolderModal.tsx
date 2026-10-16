@@ -80,6 +80,18 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
       ? customSubfolderInput.trim() 
       : selectedSubfolder.trim();
 
+    if (finalSubfolder) {
+      try {
+        const raw = localStorage.getItem('docuvault_custom_subfolders_v1');
+        const custom = raw ? JSON.parse(raw) : {};
+        const list = custom[selectedCategory] || [];
+        if (!list.includes(finalSubfolder)) {
+          custom[selectedCategory] = [...list, finalSubfolder];
+          localStorage.setItem('docuvault_custom_subfolders_v1', JSON.stringify(custom));
+        }
+      } catch {}
+    }
+
     onConfirmMove(file.id, selectedCategory, finalSubfolder || undefined);
     onClose();
   };
@@ -263,10 +275,22 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
                       type="text"
                       value={customSubfolderInput}
                       onChange={(e) => setCustomSubfolderInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSubmit(e);
+                      }}
                       placeholder="VD: Hợp đồng mua bán 2026, Mẫu tờ khai thuế..."
                       autoFocus
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-blue-300 bg-white text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-blue-300 bg-white text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
                     />
+                    {customSubfolderInput.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit()}
+                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 shadow-2xs"
+                      >
+                        Chuyển ngay
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

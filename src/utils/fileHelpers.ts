@@ -178,21 +178,49 @@ export function getCleanCategoryName(category: FileCategory): string {
 
 export function downloadFile(file: StoredFile): void {
   try {
-    let url = file.fileData;
+    let downloadUrl = '';
+    let shouldRevoke = false;
 
-    if (!url) {
+    if (file.fileData && file.fileData.startsWith('data:')) {
+      try {
+        const parts = file.fileData.split(',');
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : (file.type || 'application/octet-stream');
+        const binary = atob(parts[1]);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: mime });
+        downloadUrl = URL.createObjectURL(blob);
+        shouldRevoke = true;
+      } catch (convErr) {
+        console.warn('Fallback using raw data URL for download:', convErr);
+        downloadUrl = file.fileData;
+      }
+    } else if (file.fileData && file.fileData.startsWith('blob:')) {
+      downloadUrl = file.fileData;
+    } else if (file.fileData && file.fileData.startsWith('http')) {
+      downloadUrl = file.fileData;
+    } else {
       // If no data URL is attached, generate a descriptive text blob
       const content = `TÊN TÀI LIỆU: ${file.name}\nNHÓM TÀI LIỆU: ${getCleanCategoryName(file.category)}\nTHƯ MỤC CON: ${file.subfolder || 'Mặc định'}\nNGÀY TẢI LÊN: ${formatDateVN(file.createdAt)}\nHẠN HIỆU LỰC: ${file.expiresAt ? formatDateVN(file.expiresAt) : 'Vô thời hạn'}\nGHI CHÚ: ${file.notes || 'Không có'}\n\nNội dung tệp đã được bảo mật lưu trữ trên MyFile.`;
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      url = URL.createObjectURL(blob);
+      downloadUrl = URL.createObjectURL(blob);
+      shouldRevoke = true;
     }
 
     const a = document.createElement('a');
-    a.href = url;
+    a.href = downloadUrl;
     a.download = file.originalName || file.name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
+    if (shouldRevoke) {
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 30000);
+    }
   } catch (err) {
     console.error('Download error:', err);
   }

@@ -388,10 +388,23 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
             </button>
           )}
 
+          {/* Move Folder & Select Subfolder */}
+          {onOpenMoveFolder && (
+            <button
+              onClick={() => onOpenMoveFolder(file)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300/80 shadow-2xs transition-all active:scale-98"
+              title="Chuyển thư mục chính & thư mục con"
+            >
+              <FolderInput className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Chuyển thư mục</span>
+              <span className="sm:hidden">Chuyển</span>
+            </button>
+          )}
+
           {/* Zalo Share */}
           <button
             onClick={() => onOpenZaloShare(file)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shadow-2xs transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shadow-2xs transition-all active:scale-98"
             title="Chia sẻ tệp qua Zalo"
           >
             <div className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[8px] font-bold">

@@ -52,24 +52,22 @@ ${file.notes ? `📝 Ghi chú: ${file.notes}\n` : ''}🔗 Xem & Tải về trự
 ${shareUrl}`;
 }
 
-export function openZaloShare(url: string, title?: string, message?: string): void {
-  // Method 1: Zalo Web share link
+export function openZaloShare(url: string, title?: string, _message?: string): void {
   const zaloShareUrl = `https://zalo.me/share?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title || 'Chia sẻ tài liệu MyFile')}`;
   
-  // Try opening in new window or tab
-  const width = 600;
-  const height = 500;
-  const left = window.screen.width / 2 - width / 2;
-  const top = window.screen.height / 2 - height / 2;
-
-  const popup = window.open(
-    zaloShareUrl,
-    'ZaloShareWindow',
-    `toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=yes, resizable=yes, copyhistory=no, width=${width}, height=${height}, top=${top}, left=${left}`
-  );
-
-  if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-    // If pop-up blocked or inside restricted frame, fallback to opening directly or chat.zalo.me
-    window.open(`https://chat.zalo.me/?url=${encodeURIComponent(url)}`, '_blank');
+  try {
+    const a = document.createElement('a');
+    a.href = zaloShareUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err) {
+    try {
+      window.open(zaloShareUrl, '_blank', 'noopener,noreferrer');
+    } catch (popupErr) {
+      console.warn('Cannot open Zalo share:', popupErr);
+    }
   }
 }
