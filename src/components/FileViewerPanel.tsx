@@ -346,6 +346,9 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
                   </span>
                 </>
               )}
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold border text-[10.5px] bg-slate-100 text-slate-700 border-slate-300">
+                📄 Khổ A4 (210 × 297 mm)
+              </span>
             </div>
           </div>
         </div>
@@ -490,8 +493,8 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
             </div>
           ) : isImage && effectiveData ? (
             /* 1. IMAGE VIEWER - Displayed vertically down like an authentic A4 document page */
-            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col items-center justify-start p-6 sm:p-10 relative">
-              <div className="w-full flex justify-center overflow-auto">
+            <div className="w-full max-w-[794px] md:w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col justify-between p-6 sm:p-10 relative">
+              <div className="w-full flex justify-center overflow-auto my-auto">
                 <img
                   src={effectiveData}
                   alt={file.name}
@@ -503,10 +506,14 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
                   className="max-w-full w-auto h-auto object-contain shadow-xs rounded-xs"
                 />
               </div>
+              <div className="mt-auto pt-6 border-t border-slate-100 w-full flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                <span className="truncate max-w-[200px]">{file.name}</span>
+                <span>Khổ giấy chuẩn A4 (210 × 297 mm)</span>
+              </div>
             </div>
           ) : isPdf && blobUrl ? (
             /* 2. PDF VIEWER - Full tall A4 sheet proportions (794px x 1123px standard A4) */
-            <div className="w-full max-w-[794px] h-[1123px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col overflow-hidden">
+            <div className="w-full max-w-[794px] md:w-[794px] h-[1123px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col overflow-hidden">
               <iframe
                 src={`${blobUrl}#toolbar=1&navpanes=0`}
                 title={file.name}
@@ -515,62 +522,84 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
             </div>
           ) : isCsv && csvRows.length > 0 ? (
             /* 3. CSV SPREADSHEET - A4 document sheet */
-            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col overflow-hidden">
-              <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs shrink-0">
-                <span className="font-bold text-slate-700">Xem trước bảng tính ({csvRows.length} dòng)</span>
-                <button
-                  onClick={handleCopyText}
-                  className="flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium"
-                >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{isCopied ? 'Đã sao chép' : 'Sao chép CSV'}</span>
-                </button>
-              </div>
-              <div className="overflow-x-auto flex-1">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
-                      {csvRows[0].map((header, idx) => (
-                        <th key={idx} className="p-2.5 border-r border-slate-200 last:border-r-0 whitespace-nowrap">
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
-                    {csvRows.slice(1).map((row, rIdx) => (
-                      <tr key={rIdx} className="hover:bg-slate-50">
-                        {row.map((cell, cIdx) => (
-                          <td key={cIdx} className="p-2 border-r border-slate-100 last:border-r-0 whitespace-nowrap max-w-xs truncate">
-                            {cell}
-                          </td>
+            <div className="w-full max-w-[794px] md:w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col justify-between overflow-hidden">
+              <div>
+                <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700">Xem trước bảng tính ({csvRows.length} dòng)</span>
+                    <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] bg-slate-200 text-slate-600 font-mono">
+                      Khổ A4
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleCopyText}
+                    className="flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopied ? 'Đã sao chép' : 'Sao chép CSV'}</span>
+                  </button>
+                </div>
+                <div className="overflow-x-auto flex-1">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                        {csvRows[0].map((header, idx) => (
+                          <th key={idx} className="p-2.5 border-r border-slate-200 last:border-r-0 whitespace-nowrap">
+                            {header}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                      {csvRows.slice(1).map((row, rIdx) => (
+                        <tr key={rIdx} className="hover:bg-slate-50">
+                          {row.map((cell, cIdx) => (
+                            <td key={cIdx} className="p-2 border-r border-slate-100 last:border-r-0 whitespace-nowrap max-w-xs truncate">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="border-t border-slate-200 px-6 py-3 flex items-center justify-between text-[11px] text-slate-400 font-mono bg-slate-50/50">
+                <span>Trang tính dữ liệu CSV</span>
+                <span>Khổ giấy chuẩn A4 (210 × 297 mm)</span>
               </div>
             </div>
           ) : isText && textContent ? (
             /* 4. TEXT / DOCUMENT - Long A4 paper sheet with standard document margins */
-            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col overflow-hidden">
-              <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 text-slate-700 flex items-center justify-between text-xs shrink-0">
-                <span className="font-semibold">{file.name}</span>
-                <button
-                  onClick={handleCopyText}
-                  className="flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium"
-                >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{isCopied ? 'Đã chép' : 'Sao chép'}</span>
-                </button>
+            <div className="w-full max-w-[794px] md:w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col justify-between overflow-hidden">
+              <div>
+                <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 text-slate-700 flex items-center justify-between text-xs shrink-0">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="font-semibold truncate">{file.name}</span>
+                    <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] bg-slate-200 text-slate-600 font-mono">
+                      Khổ A4
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleCopyText}
+                    className="flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium shrink-0 ml-2"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopied ? 'Đã chép' : 'Sao chép'}</span>
+                  </button>
+                </div>
+                <div className="p-8 sm:p-14 text-slate-800 text-sm leading-relaxed overflow-auto">
+                  <pre className="whitespace-pre-wrap select-text font-mono text-xs sm:text-sm">{textContent}</pre>
+                </div>
               </div>
-              <div className="p-8 sm:p-14 flex-1 text-slate-800 text-sm leading-relaxed overflow-auto">
-                <pre className="whitespace-pre-wrap select-text font-mono text-xs sm:text-sm">{textContent}</pre>
+              <div className="border-t border-slate-200 px-6 py-3.5 flex items-center justify-between text-[11px] text-slate-400 font-mono bg-slate-50/50">
+                <span>MyFile Text Reader</span>
+                <span>Khổ giấy chuẩn A4 (210 × 297 mm)</span>
               </div>
             </div>
           ) : isAudio && effectiveData ? (
             /* 5. AUDIO VIEWER */
-            <div className="w-full max-w-[794px] min-h-[400px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col items-center justify-center p-8 text-center space-y-4">
+            <div className="w-full max-w-[794px] md:w-[794px] min-h-[400px] bg-white shadow-2xl rounded-xs border border-slate-300 my-2 flex flex-col items-center justify-center p-8 text-center space-y-4">
               <h4 className="font-bold text-slate-800 text-base">{file.name}</h4>
               <audio controls className="w-full max-w-md">
                 <source src={effectiveData} type={file.type} />
@@ -578,14 +607,14 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
             </div>
           ) : isVideo && effectiveData ? (
             /* 6. VIDEO VIEWER */
-            <div className="w-full max-w-[794px] bg-black shadow-2xl rounded-xs overflow-hidden my-2">
+            <div className="w-full max-w-[794px] md:w-[794px] bg-black shadow-2xl rounded-xs overflow-hidden my-2">
               <video controls className="w-full h-auto max-h-[80vh]">
                 <source src={effectiveData} type={file.type} />
               </video>
             </div>
           ) : (
             /* 7. WORD / EXCEL / DOCUMENTS / FALLBACK - Authentic A4 sheet page */
-            <div className="w-full max-w-[794px] min-h-[1123px] bg-white shadow-2xl border border-slate-300 rounded-xs my-2 p-10 sm:p-16 flex flex-col justify-between">
+            <div className="w-full max-w-[794px] md:w-[794px] min-h-[1123px] bg-white shadow-2xl border border-slate-300 rounded-xs my-2 p-10 sm:p-16 flex flex-col justify-between">
               <div>
                 <div className="border-b-2 border-slate-800 pb-5 mb-8 flex items-center justify-between">
                   <div>
@@ -636,7 +665,7 @@ export const FileViewerPanel: React.FC<FileViewerPanelProps> = ({
 
               <div className="border-t border-slate-200 pt-4 flex items-center justify-between text-[11px] text-slate-400 font-mono">
                 <span>MyFile Cloud Storage</span>
-                <span>Khổ A4 (210 × 297 mm)</span>
+                <span>Khổ giấy chuẩn A4 (210 × 297 mm)</span>
               </div>
             </div>
           )}

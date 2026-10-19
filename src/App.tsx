@@ -584,7 +584,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-[1540px] w-full mx-auto px-3 sm:px-5 lg:px-6 py-5 flex flex-col gap-4">
+      <main className="flex-1 max-w-[1720px] w-full mx-auto px-3 sm:px-5 lg:px-6 py-5 flex flex-col gap-4">
         
         {/* Header Title & Explorer View Controls */}
         <div className="pb-2 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -675,7 +675,7 @@ export default function App() {
           
           {/* COLUMN 1: Directory Tree Panel (5 Main Folders) */}
           {isTreeVisible && (
-            <div className={`lg:col-span-3 xl:col-span-3 h-full flex flex-col ${mobileTab === 'tree' ? 'flex' : 'hidden lg:flex'}`}>
+            <div className={`lg:col-span-3 xl:col-span-2 h-full flex flex-col ${mobileTab === 'tree' ? 'flex' : 'hidden lg:flex'}`}>
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full min-h-[700px] lg:min-h-[1200px]">
                 <FolderTree
                   files={files}
@@ -697,7 +697,7 @@ export default function App() {
           )}
 
           {/* COLUMN 2: File Names & List Panel */}
-          <div className={`${isTreeVisible ? 'lg:col-span-4 xl:col-span-4' : 'lg:col-span-5 xl:col-span-4'} h-full flex flex-col ${mobileTab === 'list' ? 'flex' : 'hidden lg:flex'}`}>
+          <div className={`${isTreeVisible ? 'lg:col-span-4 xl:col-span-4' : 'lg:col-span-4 xl:col-span-4'} h-full flex flex-col ${mobileTab === 'list' ? 'flex' : 'hidden lg:flex'}`}>
             <FileList
               files={files}
               selectedFileId={selectedFileId}
@@ -726,7 +726,7 @@ export default function App() {
           </div>
 
           {/* COLUMN 3: Live File Viewer & Expiry Details */}
-          <div className={`${isTreeVisible ? 'lg:col-span-5 xl:col-span-5' : 'lg:col-span-7 xl:col-span-8'} h-full flex flex-col ${mobileTab === 'preview' ? 'flex' : 'hidden lg:flex'}`}>
+          <div className={`${isTreeVisible ? 'lg:col-span-5 xl:col-span-6' : 'lg:col-span-8 xl:col-span-8'} h-full flex flex-col ${mobileTab === 'preview' ? 'flex' : 'hidden lg:flex'}`}>
             <FileViewerPanel
               file={activeFile}
               warningDaysThreshold={warningDaysThreshold}

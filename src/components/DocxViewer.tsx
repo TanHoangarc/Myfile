@@ -174,17 +174,20 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
   return (
     <div className={`w-full flex flex-col items-center ${className}`}>
       
-      {/* Quick Toolbar for DOCX */}
-      <div className="w-full max-w-[850px] mb-3 px-4 py-2 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-2 z-10">
+      {/* Quick Toolbar for DOCX - Exactly matches A4 paper width */}
+      <div className="w-full max-w-[794px] md:w-[794px] mb-3 px-4 py-2 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-2 z-10 shrink-0">
         
         <div className="flex items-center gap-2 text-xs text-slate-600">
-          <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px] border border-blue-200">
+          <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shadow-2xs">
             W
           </div>
-          <span className="font-semibold text-slate-800 truncate max-w-[200px] sm:max-w-xs">{file.name}</span>
+          <span className="font-semibold text-slate-800 truncate max-w-[170px] sm:max-w-xs">{file.name}</span>
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md">
+            📄 Khổ A4 (210 × 297 mm)
+          </span>
           {stats.wordCount > 0 && (
-            <span className="hidden sm:inline-block text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md">
-              {stats.wordCount.toLocaleString()} từ • {stats.charCount.toLocaleString()} ký tự
+            <span className="hidden md:inline-block text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md">
+              {stats.wordCount.toLocaleString()} từ
             </span>
           )}
         </div>
@@ -245,27 +248,27 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
 
       </div>
 
-      {/* Main Document Paper Container */}
+      {/* Main Document Paper Workspace - Scales A4 sheets accurately */}
       <div 
-        className="w-full max-w-[850px] min-h-[900px] bg-white shadow-2xl rounded-sm border border-slate-300 relative transition-transform duration-150 origin-top overflow-x-auto"
+        className="w-full flex flex-col items-center transition-transform duration-150 origin-top overflow-x-visible"
         style={{
           transform: activeZoom !== 1 ? `scale(${activeZoom})` : undefined,
           transformOrigin: 'top center'
         }}
       >
         
-        {/* Loading State */}
+        {/* Loading State - Exact A4 sheet placeholder */}
         {loading && (
-          <div className="min-h-[500px] flex flex-col items-center justify-center p-8 space-y-3">
+          <div className="w-full max-w-[794px] md:w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 flex flex-col items-center justify-center p-8 space-y-3 my-2">
             <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-semibold text-slate-700">Đang đọc tài liệu Word DOCX...</p>
-            <p className="text-xs text-slate-500">Đang hiển thị trang văn bản và định dạng gốc</p>
+            <p className="text-xs text-slate-500">Đang thiết lập trang tài liệu đúng chuẩn khổ A4 (210 × 297 mm)</p>
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center space-y-4">
+          <div className="w-full max-w-[794px] md:w-[794px] min-h-[600px] bg-white shadow-2xl rounded-xs border border-slate-300 flex flex-col items-center justify-center p-8 text-center space-y-4 my-2">
             <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-xs border border-amber-200">
               <AlertCircle className="w-7 h-7" />
             </div>
@@ -285,19 +288,34 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
           </div>
         )}
 
-        {/* 1. Primary Engine Container (docx-preview) */}
+        {/* 1. Primary Engine Container (docx-preview renders separate section.docx A4 sheets) */}
         <div 
           ref={containerRef} 
-          className={`w-full min-h-[700px] docx-viewer-wrapper p-4 sm:p-8 ${useMammothFallback || loading || error ? 'hidden' : 'block'}`}
+          className={`w-full flex flex-col items-center docx-viewer-wrapper ${useMammothFallback || loading || error ? 'hidden' : 'block'}`}
         />
 
-        {/* 2. Fallback Mammoth HTML Container */}
+        {/* 2. Fallback Mammoth HTML Container - Styled exactly like an A4 sheet */}
         {useMammothFallback && mammothHtml && !loading && !error && (
-          <div className="p-8 sm:p-14 text-slate-800 leading-relaxed text-sm sm:text-base prose prose-slate max-w-none">
-            <div 
-              dangerouslySetInnerHTML={{ __html: mammothHtml }} 
-              className="space-y-4 font-serif leading-7"
-            />
+          <div className="w-full max-w-[794px] md:w-[794px] min-h-[1123px] bg-white shadow-2xl rounded-xs border border-slate-300 p-12 sm:p-20 text-slate-800 leading-relaxed text-sm sm:text-base prose prose-slate max-w-none flex flex-col justify-between my-2">
+            <div>
+              <div className="border-b-2 border-slate-800 pb-4 mb-8 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">{file.name}</h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-mono">Dung lượng: {formatFileSize(file.size)}</p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-blue-50 text-blue-700 border-blue-200">
+                  Tài liệu DOCX
+                </span>
+              </div>
+              <div 
+                dangerouslySetInnerHTML={{ __html: mammothHtml }} 
+                className="space-y-4 font-serif leading-7"
+              />
+            </div>
+            <div className="border-t border-slate-200 pt-4 mt-12 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span>MyFile DOCX Reader</span>
+              <span>Khổ giấy chuẩn A4 (210 × 297 mm)</span>
+            </div>
           </div>
         )}
 
@@ -305,36 +323,69 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
 
       {/* Global CSS enhancements for docx preview styling */}
       <style>{`
-        .docx-preview-content {
-          background-color: transparent !important;
-          box-shadow: none !important;
-          margin: 0 auto !important;
+        .docx-viewer-wrapper {
+          width: 100% !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+        }
+        .docx-viewer-wrapper .docx-wrapper {
+          background: transparent !important;
           padding: 0 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
           width: 100% !important;
-          max-width: 100% !important;
         }
-        .docx-preview-content section.docx {
-          box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08) !important;
-          margin-bottom: 24px !important;
-          background: #ffffff !important;
-          border: 1px solid #e2e8f0 !important;
-          box-sizing: border-box !important;
+        /* DESKTOP: EXACT A4 PAPER DIMENSIONS (210mm x 297mm = 794px x 1123px at 96 DPI) */
+        @media (min-width: 768px) {
+          .docx-viewer-wrapper section.docx {
+            width: 794px !important;
+            max-width: 794px !important;
+            min-height: 1123px !important;
+            box-sizing: border-box !important;
+            margin: 8px auto 32px auto !important;
+            background: #ffffff !important;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+            border-radius: 2px !important;
+            border: 1px solid #cbd5e1 !important;
+            padding: 72px 80px !important; /* Authentic 25mm Word document margins */
+            position: relative !important;
+          }
+          /* Subtle watermark page indicator in bottom right corner of each A4 page */
+          .docx-viewer-wrapper section.docx::after {
+            content: "Khổ A4 (210 × 297 mm)";
+            position: absolute;
+            bottom: 14px;
+            right: 24px;
+            font-size: 10px;
+            font-family: monospace;
+            color: #94a3b8;
+            opacity: 0.7;
+          }
         }
-        .docx-preview-content table {
+        /* MOBILE VIEWPORT RESPONSIVENESS */
+        @media (max-width: 767px) {
+          .docx-viewer-wrapper section.docx {
+            width: 100% !important;
+            min-height: 500px !important;
+            box-sizing: border-box !important;
+            margin: 4px auto 16px auto !important;
+            background: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+            border-radius: 6px !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 24px 16px !important;
+          }
+        }
+        .docx-viewer-wrapper table {
           border-collapse: collapse !important;
-          margin: 12px 0 !important;
+          margin: 14px 0 !important;
           width: 100% !important;
         }
-        .docx-preview-content td, .docx-preview-content th {
+        .docx-viewer-wrapper td, .docx-viewer-wrapper th {
           border: 1px solid #cbd5e1 !important;
           padding: 6px 10px !important;
-        }
-        @media (max-width: 640px) {
-          .docx-preview-content section.docx {
-            padding: 16px !important;
-            width: 100% !important;
-            min-width: 100% !important;
-          }
         }
       `}</style>
     </div>
